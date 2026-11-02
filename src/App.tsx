@@ -1,8 +1,17 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { Route, Router, Switch } from 'wouter';
 import { useHashLocation } from 'wouter/use-hash-location';
 import { BottomNav } from './components/BottomNav';
+import { db } from './db/database';
+import { Onboarding } from './features/onboarding/Onboarding';
 
 export function App() {
+  // null: profil yok (onboarding), undefined: veritabanı henüz okunmadı.
+  const profile = useLiveQuery(async () => (await db.profile.get('me')) ?? null);
+
+  if (profile === undefined) return null;
+  if (profile === null) return <Onboarding />;
+
   return (
     <Router hook={useHashLocation}>
       <main className="mx-auto max-w-lg px-4 pb-24 pt-4">
