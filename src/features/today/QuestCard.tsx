@@ -89,10 +89,20 @@ export function QuestCard({ quest, onToggle, onReroll, rerollUsed, index = 0 }: 
           <PixelIcon name={missed ? 'cross' : 'check'} size={16} className={missed ? 'text-rose' : ''} />
         </span>
         <span className="min-w-0 flex-1">
-          {quest.habit && (
-            <span className="mb-1 inline-flex items-center gap-1 font-pixel text-xs text-orchid">
-              <PixelIcon name="flame" size={11} />
-              Çekirdek alışkanlık
+          {(quest.habit || quest.source === 'ai') && (
+            <span className="mb-1 flex flex-wrap items-center gap-x-3 font-pixel text-xs">
+              {quest.habit && (
+                <span className="inline-flex items-center gap-1 text-orchid">
+                  <PixelIcon name="flame" size={11} />
+                  Çekirdek alışkanlık
+                </span>
+              )}
+              {quest.source === 'ai' && (
+                <span className="inline-flex items-center gap-1 text-ice">
+                  <PixelIcon name="gem" size={11} />
+                  Yapay zekâ
+                </span>
+              )}
             </span>
           )}
           <span className={`block font-semibold leading-snug ${done ? 'text-muted line-through' : ''}`}>{quest.title}</span>

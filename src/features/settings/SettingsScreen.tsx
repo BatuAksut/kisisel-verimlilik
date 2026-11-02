@@ -76,18 +76,22 @@ function ApiSection({ settings }: { settings: AppSettings }) {
     return null;
   }
 
-  async function save() {
-    const problem = validate();
-    if (problem) return setNotice({ tone: 'error', text: problem });
+  async function persist() {
     await saveSettings({
       apiKey: form.apiKey.trim(),
       baseUrl: form.baseUrl.trim(),
       model: form.model.trim(),
       proxyUrl: form.proxyUrl.trim(),
     });
-    setNotice({ tone: 'ok', text: 'Ayarlar kaydedildi.' });
     // Hafta havuzdan kurulmuşsa yeni anahtarla kalan günler arka planda yeniden üretilir.
     void upgradePoolWeek(new Date(), true).catch(console.error);
+  }
+
+  async function save() {
+    const problem = validate();
+    if (problem) return setNotice({ tone: 'error', text: problem });
+    await persist();
+    setNotice({ tone: 'ok', text: 'Ayarlar kaydedildi.' });
   }
 
   async function runTest() {
@@ -97,7 +101,9 @@ function ApiSection({ settings }: { settings: AppSettings }) {
     setNotice({ tone: 'info', text: 'Bağlantı deneniyor...' });
     try {
       await testConnection(form);
-      setNotice({ tone: 'ok', text: 'Bağlantı çalışıyor.' });
+      // Çalıştığı görülen ayar kaydedilir: "test başarılı" deyip anahtarın kaydedilmemesi çok kafa karıştırıyor.
+      await persist();
+      setNotice({ tone: 'ok', text: 'Bağlantı çalışıyor. Ayarlar kaydedildi, Bugün ekranında durumu görebilirsin.' });
     } catch (error) {
       setNotice({ tone: 'error', text: error instanceof AiError ? error.message : String(error) });
     } finally {

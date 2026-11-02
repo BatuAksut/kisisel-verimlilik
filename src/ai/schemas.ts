@@ -21,8 +21,9 @@ export const taskSchema = z.object({
   xp: z.number().positive(),
   estimatedMinutes: z.number().positive(),
   type: z.enum(['main', 'side', 'boss']),
-  why: z.string().trim().transform((text) => text.slice(0, 300)).optional(),
-  habit: z.boolean().optional(),
+  // Modeller boş alanı null olarak da yazabiliyor; ek alan yüzünden bütün hafta reddedilmesin.
+  why: z.string().trim().transform((text) => text.slice(0, 300)).nullish(),
+  habit: z.boolean().nullish(),
 });
 
 export type RawTask = z.infer<typeof taskSchema>;

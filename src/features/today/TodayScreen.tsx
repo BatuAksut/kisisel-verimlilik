@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Link } from 'wouter';
 import { setSoundEnabled } from '../../audio/sfx';
 import { PixelIcon } from '../../components/PixelIcon';
@@ -7,7 +7,7 @@ import { Scene } from '../../components/Scene';
 import { db, getSettings } from '../../db/database';
 import { phaseOfDay, TOTAL_DAYS, weekOfDay } from '../../domain/program';
 import { heroTier, SUCCESS_THRESHOLD } from '../../domain/progress';
-import type { Profile, Quest } from '../../domain/types';
+import type { Profile, Quest, WeekRecord } from '../../domain/types';
 import { bossOfWeek, daysUntilBoss, LOCATIONS, narratorLine, timeOfDay, type BossState } from '../../domain/world';
 import { remindPendingQuests } from '../../notifications/notifications';
 import { rerollSideQuest, toggleQuest } from '../../quests/actions';
@@ -34,26 +34,52 @@ function AiBanner() {
   );
 }
 
-function SourceNotice({ lastError, hasKey }: { lastError?: string; hasKey: boolean }) {
-  if (lastError) {
+function RunAiButton({ label }: { label: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className="min-h-9 font-pixel text-sm text-ice"
+        onClick={() => {
+          setFailed(false);
+          void upgradePoolWeek(new Date(), true).then((done) => setFailed(!done), console.error);
+        }}
+      >
+        {label}
+      </button>
+      {failed && <p>Şu an üretilemedi. İnternet yoksa ya da bu hafta yenilenecek gün kalmadıysa bu normal.</p>}
+    </>
+  );
+}
+
+/** Görevleri kimin yazdığını açıkça söyler: yapay zekâ çalışıyor mu sorusu tahmine kalmasın. */
+function AiStatus({ week, hasKey, todayFromAi }: { week?: WeekRecord; hasKey: boolean; todayFromAi: boolean }) {
+  if (!week) return null;
+  if (week.source === 'ai') {
     return (
-      <div className="space-y-1 text-xs text-muted">
+      <p role="status" className="flex items-start gap-2 bg-ink-soft px-3 py-2 text-xs text-muted">
+        <PixelIcon name="gem" size={14} className="shrink-0 text-ice" />
+        {todayFromAi
+          ? 'Bu haftanın görevlerini yapay zekâ senin için yazdı.'
+          : 'Bugüne başladığın için bugünkü görevler hazır havuzdan. Yarından itibaren yapay zekâ yazdı.'}
+      </p>
+    );
+  }
+  if (week.lastError) {
+    return (
+      <div role="status" className="space-y-1 bg-ink-soft px-3 py-2 text-xs text-muted">
         <p>
-          Yapay zekâya ulaşılamadı, görevler hazır havuzdan geldi. <span className="break-words">({lastError})</span>
+          <span className="text-rose">Yapay zekâya ulaşılamadı,</span> görevler hazır havuzdan geldi.{' '}
+          <span className="break-words">({week.lastError})</span>
         </p>
-        <button
-          type="button"
-          className="min-h-9 font-pixel text-sm text-ice"
-          onClick={() => void upgradePoolWeek(new Date(), true).catch(console.error)}
-        >
-          Yeniden dene
-        </button>
+        <RunAiButton label="Yeniden dene" />
       </div>
     );
   }
   if (!hasKey) {
     return (
-      <p className="text-xs text-muted">
+      <p className="bg-ink-soft px-3 py-2 text-xs text-muted">
         Görevler hazır havuzdan geliyor.{' '}
         <Link href="/ayarlar" className="text-ice underline">
           API anahtarı ekleyerek
@@ -62,7 +88,12 @@ function SourceNotice({ lastError, hasKey }: { lastError?: string; hasKey: boole
       </p>
     );
   }
-  return null;
+  return (
+    <div className="space-y-1 bg-ink-soft px-3 py-2 text-xs text-muted">
+      <p>Anahtarın kayıtlı ama görevler şu an hazır havuzdan. Yapay zekâ bu haftayı henüz yazmadı.</p>
+      <RunAiButton label="Yapay zekâyla üret" />
+    </div>
+  );
 }
 
 function StatusBanner({ mains, threshold }: { mains: Quest[]; threshold: number }) {
@@ -214,7 +245,11 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
 
       {quests.length > 0 && (
         <>
-          {generating && <AiBanner />}
+          {generating ? (
+            <AiBanner />
+          ) : (
+            <AiStatus week={week} hasKey={settings.apiKey.trim() !== ''} todayFromAi={quests.some((quest) => quest.source === 'ai')} />
+          )}
           <StatusBanner mains={mains} threshold={SUCCESS_THRESHOLD[day?.difficulty ?? profile.difficulty]} />
           <NotificationPrompt
             dismissed={Boolean(settings.notificationPromptDismissed)}
@@ -253,10 +288,6 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
           {!boss && bossIn > 0 && <BossTeaser boss={weekBoss} days={bossIn} />}
 
           <ReflectionCard key={`${todayNumber}-${reflection?.createdAt ?? 0}`} todayNumber={todayNumber} saved={reflection} />
-
-          {week?.source === 'pool' && !generating && (
-            <SourceNotice lastError={week.lastError} hasKey={settings.apiKey.trim() !== ''} />
-          )}
         </>
       )}
     </div>

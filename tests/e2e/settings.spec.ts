@@ -22,11 +22,44 @@ test('anahtar girilince görevler yapay zekâdan gelir, istek doğru biçimdedir
 
   await expect(page.getByText('AI görevi m1-1')).toBeVisible();
   await expect(page.getByText('Mock Teması')).toBeVisible();
+  await expect(page.getByText('Bu haftanın görevlerini yapay zekâ senin için yazdı.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Ana görevler' }).getByText('Yapay zekâ', { exact: true })).toHaveCount(4);
   expect(requests).toHaveLength(1);
   expect(requests[0].url).toBe('https://api.deepseek.com/chat/completions');
   expect(requests[0].auth).toBe('Bearer test-anahtari');
   expect(requests[0].body.model).toBe('deepseek-flash');
   expect(requests[0].body.response_format).toEqual({ type: 'json_object' });
+});
+
+test('bağlantı testi başarılıysa anahtar kaydedilir ve görevler yapay zekâdan gelir', async ({ page }) => {
+  await page.route(API_PATTERN, async (route) => {
+    const body = route.request().postData() ?? '';
+    await route.fulfill(chatReply(body.includes('bağlantı testidir') ? '{"ok":true}' : JSON.stringify(aiWeek([1, 2, 3, 4, 5, 6, 7]))));
+  });
+  await page.clock.setFixedTime(at('2026-03-02T10:00:00'));
+  await completeOnboarding(page);
+  await expect(page.getByText('Görevler hazır havuzdan geliyor.')).toBeVisible();
+  await expect(page.getByText('Yapay zekâ', { exact: true })).toHaveCount(0);
+
+  await openSettings(page);
+  await page.getByPlaceholder('sk-...').fill('test-anahtari');
+  await page.getByRole('button', { name: 'Bağlantıyı test et' }).click();
+  await expect(page.getByText(/Bağlantı çalışıyor\. Ayarlar kaydedildi/)).toBeVisible();
+
+  await page.getByRole('link', { name: 'Bugün' }).click();
+  await expect(page.getByText('Bu haftanın görevlerini yapay zekâ senin için yazdı.')).toBeVisible();
+  await expect(page.getByText('AI görevi m1-1')).toBeVisible();
+});
+
+test('başarısız bağlantı testi anahtarı kaydetmez', async ({ page }) => {
+  await page.route(API_PATTERN, (route) => route.fulfill({ status: 401, body: '{}', headers: { 'Access-Control-Allow-Origin': '*' } }));
+  await completeOnboarding(page);
+  await openSettings(page);
+  await page.getByPlaceholder('sk-...').fill('yanlis-anahtar');
+  await page.getByRole('button', { name: 'Bağlantıyı test et' }).click();
+  await expect(page.getByText('API anahtarı reddedildi (HTTP 401).')).toBeVisible();
+  await page.reload();
+  await expect(page.getByPlaceholder('sk-...')).toHaveValue('');
 });
 
 test('model bozuk JSON döndürürse bir kez yeniden dener', async ({ page }) => {
@@ -76,6 +109,7 @@ test('yapay zekâ yanıt vermezken görevler hemen kullanılabilir, başlanınca
   await expect(page.getByText('Mock Teması')).toBeVisible();
   await expect(mains.nth(0)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('AI görevi m1-1')).toHaveCount(0);
+  await expect(page.getByText('Bugüne başladığın için bugünkü görevler hazır havuzdan.')).toBeVisible();
 
   await page.clock.setFixedTime(at('2026-03-03T10:00:00'));
   await page.reload();

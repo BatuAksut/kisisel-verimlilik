@@ -243,6 +243,13 @@ describe('yapay zekâ görev şeması', () => {
     expect(normalizeTask(rawTask(), 'main', 'x').why).toBeUndefined();
   });
 
+  it('gerekçe veya alışkanlık alanı null gelirse planı reddetmez', () => {
+    const plan = structuredClone(validPlan);
+    Object.assign(plan.days[0].side[0], { why: null, habit: null });
+    expect(weekPlanSchema([1, 2]).safeParse(plan).success).toBe(true);
+    expect(normalizeTask({ ...rawTask(), why: null, habit: null }, 'main', 'x')).toMatchObject({ why: undefined, habit: undefined });
+  });
+
   it('özellik puanı vermeyen görevi reddeder', () => {
     const plan = structuredClone(validPlan);
     plan.boss.stats = {};
