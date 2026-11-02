@@ -35,6 +35,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,woff2}'],
         navigateFallback: `${base}index.html`,
+        importScripts: ['sw-notifications.js'],
       },
     }),
   ],
