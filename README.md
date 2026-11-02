@@ -40,7 +40,7 @@ npx playwright install chromium
 1. <https://platform.deepseek.com/api_keys> adresinde hesap açıp bir API anahtarı oluşturun. API kullanımı ücretlidir, hesaba bakiye yüklemeniz gerekebilir.
 2. Uygulamada anahtarı anketin son adımına ya da **Ayarlar > Yapay zekâ** bölümüne yazın.
 3. **Bağlantıyı test et** düğmesine basın. Test başarılıysa ayarlar da kaydedilir. **Kaydet** testi atlayıp doğrudan kaydeder.
-4. **Bugün** ekranına dönün. Görevlerin üstündeki satır görevleri kimin yazdığını söyler; yapay zekânın yazdığı görevlerde **Yapay zekâ** etiketi görünür. Üretim 1-2 dakika sürebilir.
+4. **Bugün** ekranına dönün. Görevlerin üstündeki satır görevleri kimin yazdığını söyler; yapay zekânın yazdığı görevlerde **Yapay zekâ** etiketi görünür. Üretim genelde yarım dakika sürer; şeritte yüzde ve geçen süre görünür, **Vazgeç** ile durdurulabilir. DeepSeek'te düşünme adımı hız için kapalıdır (gerçek ölçüm: bir hafta açıkken 83 sn, kapalıyken 25-35 sn).
 
 Hata alırsanız:
 
