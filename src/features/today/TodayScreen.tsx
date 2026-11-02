@@ -8,37 +8,41 @@ import { SUCCESS_THRESHOLD } from '../../domain/progress';
 import type { Profile, Quest } from '../../domain/types';
 import { remindPendingQuests } from '../../notifications/notifications';
 import { rerollSideQuest, toggleQuest } from '../../quests/actions';
-import { skipAiWait, syncStatus } from '../../quests/sync';
+import { syncStatus, upgradePoolWeek } from '../../quests/sync';
 import { useProgress } from '../useProgram';
 import { HeroBar, LevelUpToast, YesterdayNotice } from './HeroBar';
+import { InstallPrompt } from './InstallPrompt';
 import { NotificationPrompt } from './NotificationPrompt';
 import { QuestCard } from './QuestCard';
 import { ReflectionCard } from './ReflectionCard';
 
-function GeneratingCard({ generating }: { generating: boolean }) {
+function AiBanner() {
   return (
-    <section className="panel pixel-frame space-y-3 p-4 text-center">
-      <PixelIcon name="flag" size={32} className="text-amber" />
-      <p className="font-pixel text-lg">Haftanın görevleri hazırlanıyor</p>
-      {generating && (
-        <>
-          <p className="text-sm text-muted">Yapay zekâ senin için plan yazıyor, bu bir dakika kadar sürebilir.</p>
-          <button type="button" className="pixel-btn pixel-btn-ghost pixel-frame" onClick={skipAiWait}>
-            Beklemeden başla
-          </button>
-        </>
-      )}
-    </section>
+    <p role="status" className="flex items-start gap-2 bg-panel-high px-3 py-2 text-sm">
+      <PixelIcon name="star" size={16} className="mt-0.5 animate-pulse text-orchid" />
+      <span>
+        Yapay zekâ sana özel görevleri hazırlıyor, bu 1-2 dakika sürebilir. O zamana kadar bu görevlerle başlayabilirsin.
+        Birini işaretlersen bugün bunlarla devam edersin, yenileri yarından gelir.
+      </span>
+    </p>
   );
 }
 
 function SourceNotice({ lastError, hasKey }: { lastError?: string; hasKey: boolean }) {
   if (lastError) {
     return (
-      <p className="text-xs text-muted">
-        Yapay zekâya ulaşılamadı, görevler hazır havuzdan geldi. Sonraki günler için yeniden denenecek.{' '}
-        <span className="break-words">({lastError})</span>
-      </p>
+      <div className="space-y-1 text-xs text-muted">
+        <p>
+          Yapay zekâya ulaşılamadı, görevler hazır havuzdan geldi. <span className="break-words">({lastError})</span>
+        </p>
+        <button
+          type="button"
+          className="min-h-9 font-pixel text-sm text-ice"
+          onClick={() => void upgradePoolWeek(new Date(), true).catch(console.error)}
+        >
+          Yeniden dene
+        </button>
+      </div>
     );
   }
   if (!hasKey) {
@@ -168,10 +172,11 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
       {progress && <HeroBar progress={progress} />}
       {progress && <YesterdayNotice progress={progress} todayNumber={todayNumber} />}
 
-      {quests.length === 0 ? (
-        <GeneratingCard generating={generating} />
-      ) : (
+      <InstallPrompt dismissed={Boolean(settings.installPromptDismissed)} />
+
+      {quests.length > 0 && (
         <>
+          {generating && <AiBanner />}
           <StatusBanner mains={mains} threshold={SUCCESS_THRESHOLD[day?.difficulty ?? profile.difficulty]} />
           <NotificationPrompt
             dismissed={Boolean(settings.notificationPromptDismissed)}
@@ -212,7 +217,9 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
 
           <ReflectionCard key={`${todayNumber}-${reflection?.createdAt ?? 0}`} todayNumber={todayNumber} saved={reflection} />
 
-          {week?.source === 'pool' && <SourceNotice lastError={week.lastError} hasKey={settings.apiKey.trim() !== ''} />}
+          {week?.source === 'pool' && !generating && (
+            <SourceNotice lastError={week.lastError} hasKey={settings.apiKey.trim() !== ''} />
+          )}
         </>
       )}
     </div>

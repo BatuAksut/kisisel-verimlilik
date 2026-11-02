@@ -31,6 +31,38 @@ test('internet kesilse de uygulama açılır ve görevler çalışır', async ({
   await expect(mains.nth(0)).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('tarayıcıda açılınca kurulum kartı çıkar, Yükle tarayıcı penceresini açar', async ({ page }) => {
+  await completeOnboarding(page);
+  const card = page.getByRole('region', { name: 'Uygulamayı yükle' });
+  await expect(card.getByText('Ana ekrana ekle')).toBeVisible();
+
+  await page.evaluate(() => {
+    const event = new Event('beforeinstallprompt', { cancelable: true }) as Event & { prompt?: () => Promise<void> };
+    event.prompt = async () => {
+      (window as unknown as { promptCalled: boolean }).promptCalled = true;
+    };
+    window.dispatchEvent(event);
+  });
+  await card.getByRole('button', { name: 'Yükle' }).click();
+  expect(await page.evaluate(() => (window as unknown as { promptCalled: boolean }).promptCalled)).toBe(true);
+
+  await card.getByRole('button', { name: 'Gizle' }).click();
+  await expect(card).toBeHidden();
+});
+
+test('kurulu uygulamada kurulum kartı çıkmaz', async ({ page }) => {
+  await page.addInitScript(() => {
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query) =>
+      query.includes('display-mode: standalone')
+        ? ({ matches: true, addEventListener() {}, removeEventListener() {} } as unknown as MediaQueryList)
+        : original(query);
+  });
+  await completeOnboarding(page);
+  await expect(questButtons(page, 'Ana görevler')).toHaveCount(4);
+  await expect(page.getByRole('region', { name: 'Uygulamayı yükle' })).toHaveCount(0);
+});
+
 test('izin verilmişse açılışta bekleyen görevleri bildirimle hatırlatır, sık tekrarlamaz', async ({ page }) => {
   // Başsız Chromium izni her zaman "denied" bildirir ve bildirim gösteremez. Bu yüzden izin taklit edilir,
   // uygulamanın service worker'dan bildirim istediği kaydedilerek doğrulanır.

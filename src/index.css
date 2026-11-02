@@ -78,10 +78,22 @@
     overscroll-behavior-y: none;
   }
 
+  /* Uygulama hissi: metin seçimi, uzun basma menüsü ve çift dokunuşla yakınlaştırma kapalı. */
   body {
     min-height: 100dvh;
     background: var(--color-ink);
     overflow-x: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input,
+  textarea {
+    user-select: text;
+    -webkit-user-select: text;
   }
 
   h1,

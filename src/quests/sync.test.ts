@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, saveSettings } from '../db/database';
 import type { OnboardingAnswers, Profile } from '../domain/types';
 import { rerollSideQuest, toggleQuest } from './actions';
-import { syncProgram, upgradePoolWeek } from './sync';
+import { aiSettled, syncProgram, upgradePoolWeek } from './sync';
 
 const answers: OnboardingAnswers = {
   goals: ['Odaklanmak'],
@@ -87,6 +87,10 @@ describe('program eşitleme', () => {
     await saveSettings({ apiKey: 'test-key' });
     await syncProgram(onDay(1));
 
+    // Görevler ağ isteğini beklemeden gelir.
+    expect((await questsOn(1)).length).toBeGreaterThan(0);
+    await aiSettled();
+
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const week = await db.weeks.get(1);
     expect(week?.source).toBe('ai');
@@ -100,6 +104,7 @@ describe('program eşitleme', () => {
     await createProfile();
     await saveSettings({ apiKey: 'test-key' });
     await syncProgram(onDay(1));
+    await aiSettled();
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect((await questsOn(1)).length).toBeGreaterThanOrEqual(5);
@@ -155,6 +160,7 @@ describe('program eşitleme', () => {
       return jsonReply(aiWeek([8, 9, 10, 11, 12, 13, 14]));
     });
     await syncProgram(onDay(8));
+    await aiSettled();
 
     const context = prompts.find((prompt) => prompt.includes('"hafta": 2'));
     expect(context).toContain('Yorgun bir gündü');
@@ -185,9 +191,10 @@ describe('program eşitleme', () => {
 });
 
 describe('havuz haftasını yükseltme', () => {
-  it('anahtar eklenince yalnızca gelecek günleri yeniden üretir', async () => {
+  it('bugünün görevine başlandıysa yalnızca gelecek günleri yeniden üretir', async () => {
     await createProfile();
     await syncProgram(onDay(3));
+    await toggleQuest((await questsOn(3))[0].id, 3);
     const todayBefore = await questsOn(3);
     await saveSettings({ apiKey: 'test-key' });
 
@@ -199,6 +206,46 @@ describe('havuz haftasını yükseltme', () => {
     expect((await questsOn(4)).every((quest) => quest.source === 'ai')).toBe(true);
     expect((await questsOn(7)).filter((quest) => quest.type === 'boss')).toHaveLength(1);
     expect((await db.weeks.get(1))?.source).toBe('ai');
+  });
+
+  it('bugüne dokunulmadıysa bugünün görevlerini de değiştirir', async () => {
+    await createProfile();
+    await syncProgram(onDay(3));
+    await aiSettled();
+    await saveSettings({ apiKey: 'test-key' });
+
+    stubFetch(() => jsonReply(aiWeek([3, 4, 5, 6, 7])));
+    expect(await upgradePoolWeek(onDay(3), true)).toBe(true);
+    expect((await questsOn(3)).every((quest) => quest.source === 'ai')).toBe(true);
+  });
+
+  it('istek sürerken görev işaretlenirse bugünkü görevler korunur', async () => {
+    await createProfile();
+    await syncProgram(onDay(3));
+    await aiSettled();
+    await saveSettings({ apiKey: 'test-key' });
+    const [first] = await questsOn(3);
+
+    stubFetch(async () => {
+      await toggleQuest(first.id, 3);
+      return jsonReply(aiWeek([3, 4, 5, 6, 7]));
+    });
+    expect(await upgradePoolWeek(onDay(3), true)).toBe(true);
+
+    expect((await db.quests.get(first.id))?.status).toBe('done');
+    expect((await questsOn(3)).every((quest) => quest.source === 'pool')).toBe(true);
+    expect((await questsOn(4)).every((quest) => quest.source === 'ai')).toBe(true);
+  });
+
+  it('haftanın son gününde, bugüne başlandıysa istek atmaz', async () => {
+    await createProfile();
+    await syncProgram(onDay(7));
+    await toggleQuest((await questsOn(7))[0].id, 7);
+    await saveSettings({ apiKey: 'test-key' });
+
+    const fetchMock = stubFetch(() => jsonReply({}));
+    expect(await upgradePoolWeek(onDay(7), true)).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('başarısız denemeden sonra bir saat beklemeden tekrar denemez', async () => {
@@ -267,6 +314,7 @@ describe('yan görev değiştirme', () => {
     await createProfile();
     await saveSettings({ apiKey: 'test-key' });
     await syncProgram(onDay(1));
+    await aiSettled();
 
     const replacement = await rerollSideQuest((await sideOf(1))[0].id, 1);
     expect(replacement?.title).toBe('Yapay zekâ görevi spare1');

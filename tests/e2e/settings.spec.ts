@@ -53,11 +53,49 @@ test('API çalışmazsa görevler havuzdan gelir ve neden yazılır', async ({ p
   expect(calls).toBe(2);
 });
 
-test('yapay zekâ yavaşsa beklemeden havuzla başlanabilir', async ({ page }) => {
-  await page.route(API_PATTERN, () => new Promise(() => undefined));
+test('yapay zekâ yanıt vermezken görevler hemen kullanılabilir, başlanınca bugün korunur', async ({ page }) => {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(API_PATTERN, async (route) => {
+    await held;
+    await route.fulfill(chatReply(JSON.stringify(aiWeek([1, 2, 3, 4, 5, 6, 7]))));
+  });
+  await page.clock.setFixedTime(at('2026-03-02T10:00:00'));
   await completeOnboarding(page, { apiKey: 'test-anahtari' });
-  await page.getByRole('button', { name: 'Beklemeden başla' }).click();
-  await expect(questButtons(page, 'Ana görevler')).toHaveCount(4);
+
+  const mains = questButtons(page, 'Ana görevler');
+  await expect(mains).toHaveCount(4);
+  await expect(page.getByText('Yapay zekâ sana özel görevleri hazırlıyor')).toBeVisible();
+  await mains.nth(0).click();
+  await expect(mains.nth(0)).toHaveAttribute('aria-pressed', 'true');
+
+  release();
+  await expect(page.getByText('Yapay zekâ sana özel görevleri hazırlıyor')).toBeHidden();
+  await expect(page.getByText('Mock Teması')).toBeVisible();
+  await expect(mains.nth(0)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('AI görevi m1-1')).toHaveCount(0);
+
+  await page.clock.setFixedTime(at('2026-03-03T10:00:00'));
+  await page.reload();
+  await expect(page.getByText('AI görevi m2-1')).toBeVisible();
+});
+
+test('yapay zekâ hatasında Yeniden dene çalışır', async ({ page }) => {
+  let healthy = false;
+  await page.route(API_PATTERN, (route) =>
+    healthy
+      ? route.fulfill(chatReply(JSON.stringify(aiWeek([1, 2, 3, 4, 5, 6, 7]))))
+      : route.fulfill({ status: 500, body: '{}', headers: { 'Access-Control-Allow-Origin': '*' } }),
+  );
+  await page.clock.setFixedTime(at('2026-03-02T10:00:00'));
+  await completeOnboarding(page, { apiKey: 'test-anahtari' });
+  await expect(page.getByText('Yapay zekâya ulaşılamadı')).toBeVisible();
+
+  healthy = true;
+  await page.getByRole('button', { name: 'Yeniden dene' }).click();
+  await expect(page.getByText('AI görevi m1-1')).toBeVisible();
 });
 
 test('ayarlar kaydedilir ve proxy adresi kullanılır', async ({ page }) => {

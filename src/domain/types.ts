@@ -111,6 +111,7 @@ export interface AppSettings {
   proxyUrl: string;
   lastReminderAt?: number;
   notificationPromptDismissed?: boolean;
+  installPromptDismissed?: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

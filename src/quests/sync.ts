@@ -1,12 +1,12 @@
-import { AiError, isAiConfigured } from '../ai/client';
+import { isAiConfigured } from '../ai/client';
 import { db, getSettings } from '../db/database';
 import { dayNumberFor, toDateKey } from '../domain/dates';
 import { daysOfWeek, TOTAL_DAYS, weekOfDay } from '../domain/program';
-import { missingDayRecords, overdueQuestIds } from '../domain/reset';
+import { isDayUntouched, missingDayRecords, overdueQuestIds } from '../domain/reset';
 import type { AppSettings, Profile } from '../domain/types';
 import { buildWeek, saveWeekPlan } from './generator';
 
-const UPGRADE_RETRY_MS = 60 * 60 * 1000;
+const AI_RETRY_MS = 60 * 60 * 1000;
 
 export function todayNumberFor(profile: Pick<Profile, 'startDate'>, now: Date = new Date()): number {
   return dayNumberFor(profile.startDate, toDateKey(now));
@@ -18,13 +18,11 @@ function canUseAi(settings: AppSettings): boolean {
 
 function describeError(error: unknown): string | undefined {
   if (error === undefined) return undefined;
-  if (error instanceof AiError && error.kind === 'aborted') return undefined;
   return error instanceof Error ? error.message : String(error);
 }
 
-// Arayüzün "hazırlanıyor" ekranı için küçük bir durum aboneliği.
+// Arayüzdeki "yapay zekâ çalışıyor" şeridi için küçük bir durum aboneliği.
 let generating = false;
-let waitController: AbortController | null = null;
 const listeners = new Set<() => void>();
 
 function setGenerating(value: boolean) {
@@ -35,15 +33,12 @@ function setGenerating(value: boolean) {
 export const syncStatus = {
   subscribe(listener: () => void) {
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   },
   isGenerating: () => generating,
 };
-
-/** "Beklemeden başla" düğmesi: yapay zekâyı iptal eder, hafta havuzdan kurulur. */
-export function skipAiWait(): void {
-  waitController?.abort();
-}
 
 /** Geçmiş günleri kapatır: eksik gün kayıtları açılır, bekleyen görevler "kaçırıldı" olur. */
 export async function closePastDays(profile: Profile, todayNumber: number): Promise<void> {
@@ -59,51 +54,66 @@ export async function closePastDays(profile: Profile, todayNumber: number): Prom
   });
 }
 
-async function generateWeek(profile: Profile, settings: AppSettings, weekNumber: number, todayNumber: number) {
-  const days = daysOfWeek(weekNumber).filter((day) => day >= todayNumber);
-  const useAi = canUseAi(settings);
-  if (useAi) {
-    waitController = new AbortController();
-    setGenerating(true);
-  }
-  try {
-    const result = await buildWeek(profile, settings, weekNumber, days, useAi, waitController?.signal);
-    await saveWeekPlan(weekNumber, result.plan, result.source, todayNumber, {
-      attemptedAt: useAi ? Date.now() : undefined,
-      error: describeError(result.error),
-    });
-  } finally {
-    waitController = null;
-    setGenerating(false);
-  }
+async function isTodayUntouched(todayNumber: number): Promise<boolean> {
+  const [quests, day] = await Promise.all([db.quests.where('dayNumber').equals(todayNumber).toArray(), db.days.get(todayNumber)]);
+  return isDayUntouched(quests, day);
 }
 
 /**
- * Hafta havuzdan kurulmuşsa ve yapay zekâ artık kullanılabiliyorsa yarından itibaren olan günleri
- * yeniden üretir. Bugünün görevlerine dokunmaz, çünkü kullanıcı onlara başlamış olabilir.
+ * Havuzdan kurulan haftayı yapay zekâ planıyla değiştirir. Kullanıcı bugünkü görevlere başladıysa
+ * bugüne dokunmaz, yalnızca sonraki günleri değiştirir. Arayüz bu işi beklemez.
  */
-export async function upgradePoolWeek(now: Date = new Date(), force = false): Promise<boolean> {
+async function runAiUpgrade(now: Date, force: boolean): Promise<boolean> {
   const profile = await db.profile.get('me');
   if (!profile) return false;
   const todayNumber = todayNumberFor(profile, now);
-  if (todayNumber < 1 || todayNumber >= TOTAL_DAYS) return false;
+  if (todayNumber < 1 || todayNumber > TOTAL_DAYS) return false;
 
   const settings = await getSettings();
   const weekNumber = weekOfDay(todayNumber);
   const week = await db.weeks.get(weekNumber);
   if (!week || week.source !== 'pool' || !canUseAi(settings)) return false;
-  if (!force && week.lastAiAttemptAt && now.getTime() - week.lastAiAttemptAt < UPGRADE_RETRY_MS) return false;
+  if (!force && week.lastAiAttemptAt && now.getTime() - week.lastAiAttemptAt < AI_RETRY_MS) return false;
 
-  const days = daysOfWeek(weekNumber).filter((day) => day > todayNumber);
+  const firstDay = (await isTodayUntouched(todayNumber)) ? todayNumber : todayNumber + 1;
+  const days = daysOfWeek(weekNumber).filter((day) => day >= firstDay);
   if (days.length === 0) return false;
 
-  const result = await buildWeek(profile, settings, weekNumber, days, true);
-  if (result.source === 'ai') {
-    await saveWeekPlan(weekNumber, result.plan, 'ai', todayNumber + 1, { attemptedAt: now.getTime() });
-    return true;
+  setGenerating(true);
+  try {
+    const result = await buildWeek(profile, settings, weekNumber, days, true);
+    // İstek sürerken kullanıcı bugünün görevlerine başlamış olabilir.
+    const fromDay = (await isTodayUntouched(todayNumber)) ? firstDay : Math.max(firstDay, todayNumber + 1);
+    const plannedDays = result.plan.days.filter((day) => day.day >= fromDay);
+    if (result.source === 'ai' && plannedDays.length > 0) {
+      await saveWeekPlan(weekNumber, { ...result.plan, days: plannedDays }, 'ai', fromDay, { attemptedAt: now.getTime() });
+      return true;
+    }
+    await db.weeks.update(weekNumber, { lastAiAttemptAt: now.getTime(), lastError: describeError(result.error) });
+    return false;
+  } catch (error) {
+    // Plan kaydedilemezse de havuz görevleri yerinde kalır.
+    await db.weeks.update(weekNumber, { lastAiAttemptAt: now.getTime(), lastError: describeError(error) });
+    return false;
+  } finally {
+    setGenerating(false);
   }
-  await db.weeks.update(weekNumber, { lastAiAttemptAt: now.getTime(), lastError: describeError(result.error) });
-  return false;
+}
+
+let aiRun: Promise<boolean> | null = null;
+
+export function upgradePoolWeek(now: Date = new Date(), force = false): Promise<boolean> {
+  // Ayarlar'dan yeni anahtar geldiyse, süren istek eski anahtarla olabilir: bitince yeniden denenir.
+  if (aiRun) return force ? aiRun.then(() => upgradePoolWeek(now, true)) : aiRun;
+  aiRun = runAiUpgrade(now, force).finally(() => {
+    aiRun = null;
+  });
+  return aiRun;
+}
+
+/** Testler için: arka plandaki yapay zekâ işinin bitmesini bekler. */
+export function aiSettled(): Promise<unknown> {
+  return aiRun ?? Promise.resolve();
 }
 
 async function runSync(now: Date): Promise<void> {
@@ -122,10 +132,12 @@ async function runSync(now: Date): Promise<void> {
     db.quests.where('dayNumber').equals(todayNumber).count(),
   ]);
   if (!week || todayCount === 0) {
-    await generateWeek(profile, settings, weekNumber, todayNumber);
-  } else {
-    void upgradePoolWeek(now).catch(() => undefined);
+    // Görevler önce havuzdan kurulur: uygulama ağ isteğini beklemeden her zaman kullanılabilir.
+    const days = daysOfWeek(weekNumber).filter((day) => day >= todayNumber);
+    const { plan } = await buildWeek(profile, settings, weekNumber, days, false);
+    await saveWeekPlan(weekNumber, plan, 'pool', todayNumber, {});
   }
+  void upgradePoolWeek(now).catch(console.error);
 }
 
 let activeSync: Promise<void> | null = null;

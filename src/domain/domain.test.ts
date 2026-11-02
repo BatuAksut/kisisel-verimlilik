@@ -13,7 +13,7 @@ import {
   totalXpAtLevel,
 } from './progress';
 import { REMINDER_INTERVAL_MS, shouldRemind } from './reminders';
-import { missingDayRecords, overdueQuestIds } from './reset';
+import { isDayUntouched, missingDayRecords, overdueQuestIds } from './reset';
 import type { DayRecord, Difficulty, Quest, QuestStatus, QuestType, Reflection } from './types';
 
 function quest(dayNumber: number, status: QuestStatus, overrides: Partial<Quest> & { type?: QuestType } = {}): Quest {
@@ -107,6 +107,13 @@ describe('gün sıfırlama', () => {
       { id: 'bugun', dayNumber: 4, status: 'pending' as const },
     ];
     expect(overdueQuestIds(quests, 4)).toEqual(['dun-bekleyen']);
+  });
+
+  it('görev bitirilmiş ya da değiştirilmişse gün dokunulmuş sayılır', () => {
+    expect(isDayUntouched([{ status: 'pending' }], { rerollUsed: false })).toBe(true);
+    expect(isDayUntouched([{ status: 'pending' }], undefined)).toBe(true);
+    expect(isDayUntouched([{ status: 'pending' }, { status: 'done' }], { rerollUsed: false })).toBe(false);
+    expect(isDayUntouched([{ status: 'pending' }], { rerollUsed: true })).toBe(false);
   });
 
   it('uygulama açılmayan günleri de kayıt altına alır', () => {

@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OnboardingAnswers } from '../domain/types';
 import { toggleQuest } from '../quests/actions';
 import { syncProgram } from '../quests/sync';
@@ -26,6 +26,8 @@ async function seed() {
 }
 
 beforeEach(async () => {
+  // Sahte anahtarla gerçek API'ye istek gitmesin.
+  vi.stubGlobal('navigator', { onLine: false });
   await Promise.all(db.tables.map((table) => table.clear()));
 });
 

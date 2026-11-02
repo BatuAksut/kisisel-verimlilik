@@ -7,6 +7,11 @@ export function overdueQuestIds(quests: Pick<Quest, 'id' | 'dayNumber' | 'status
   return quests.filter((quest) => quest.status === 'pending' && quest.dayNumber < todayNumber).map((quest) => quest.id);
 }
 
+/** Kullanıcı o günün görevlerine başlamadıysa görevler yeni planla sessizce değiştirilebilir. */
+export function isDayUntouched(quests: Pick<Quest, 'status'>[], day: Pick<DayRecord, 'rerollUsed'> | undefined): boolean {
+  return !day?.rerollUsed && quests.every((quest) => quest.status === 'pending');
+}
+
 /** Uygulamanın açılmadığı günler dahil, bugüne kadar kaydı olmayan günleri üretir. */
 export function missingDayRecords(
   existing: Pick<DayRecord, 'dayNumber'>[],

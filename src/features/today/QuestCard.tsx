@@ -30,9 +30,10 @@ export function QuestCard({ quest, onToggle, onReroll, rerollUsed }: QuestCardPr
         aria-pressed={done}
         aria-label={`${quest.title}: ${done ? 'tamamlandı, geri al' : 'tamamla'}`}
         disabled={missed}
-        className="flex w-full items-start gap-3 p-3 text-left"
+        className="flex w-full items-start gap-3 p-3 text-left active:bg-panel-high"
         onClick={() => {
           setJustDone(!done);
+          if (!done) navigator.vibrate?.(15);
           onToggle(quest);
         }}
       >

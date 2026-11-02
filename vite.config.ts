@@ -22,6 +22,7 @@ export default defineConfig({
         lang: 'tr',
         theme_color: '#11181c',
         background_color: '#11181c',
+        id: base,
         display: 'standalone',
         orientation: 'portrait',
         start_url: base,

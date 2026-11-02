@@ -56,7 +56,7 @@ Hata alırsanız:
 > | `deepseek-flash` | 57 sn | 12.897 | 55-60 dk |
 > | `deepseek-chat` | 19 sn | 5.501 | 64-139 dk |
 >
-> Düşünme adımı çıktıyı daha pahalı ve yavaş yapıyor ama süre kuralına çok daha iyi uyuyor. Üretim haftada yalnızca bir kez yapılır. Beklemek istemezseniz ekrandaki **Beklemeden başla** düğmesi o haftayı hazır havuzla başlatır.
+> Düşünme adımı çıktıyı daha pahalı ve yavaş yapıyor ama süre kuralına çok daha iyi uyuyor. Üretim haftada yalnızca bir kez yapılır ve arka planda çalışır: görevler önce hazır havuzdan gelir, plan hazır olunca bugünkü görevlere başlamadıysanız onları da değiştirir.
 >
 > Aynı denemede DeepSeek, GitHub Pages kökeninden gelen isteklere CORS izni verdi. Bu nedenle proxy büyük olasılıkla gerekmez.
 
@@ -125,7 +125,7 @@ Otomatik testler sahte API yanıtlarıyla ve masaüstü Chromium'da çalışır.
 | Seri dondurucu | Her hafta sonunda 1 tane kazanılır, en fazla 3 birikir. Seri varken başarısız bir günde otomatik kullanılır. |
 | Hard Mode cezası | Kaçırılan her ana görev için o görevin XP'sinin yarısı düşülür. Hiç açılmayan gün için 40 XP düşülür. Seviye düşmez, dondurucu cezayı silmez. |
 | Yan görev değiştirme | Günde 1 hak. Önce haftanın yedek görevleri, sonra hazır havuz kullanılır. |
-| Yapay zekâ başarısızsa | Hatalı yanıtta bir kez yeniden denenir, sonra hafta havuzdan kurulur. En erken bir saat sonra, uygulama açıldığında kalan günler için yeniden denenir. |
+| Yapay zekâ başarısızsa | Hatalı yanıtta bir kez yeniden denenir, olmazsa havuz görevleri kalır ve ekranda nedeni yazar. **Yeniden dene** ile hemen, yoksa en erken bir saat sonra uygulama açıldığında yeniden denenir. |
 | Güvenlik | Model kurallarla sınırlanır. Yine de oruç, kalori, diyet, ilaç gibi ifadeler içeren görevler atılır, yerine havuzdan görev gelir. |
 
 ## Klasör yapısı
