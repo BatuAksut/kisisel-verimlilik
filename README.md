@@ -49,7 +49,14 @@ Hata alırsanız:
 | Yeterli bakiye yok | Sağlayıcı hesabına bakiye yükleyin |
 | Sunucuya ulaşılamadı, CORS engeli olabilir | [Proxy'yi](proxy/README.md) kurup adresini **Proxy URL** alanına yazın |
 
-> **Model adı hakkında not:** Varsayılan model `deepseek-chat`'tir. DeepSeek'in değişiklik günlüğü bu adın 2026-07-24'te kaldırılacağını söylüyor, güncel belgeler ise `deepseek-flash` adını kullanıyor. 2026-11-02'de yapılan denemede `deepseek-chat` hâlâ yanıt verdi ve isteği `deepseek-flash` karşıladı, ama her an kapatılabilir. Model hatası alırsanız **Model** alanına `deepseek-flash` yazın. O da aynı denemede çalıştı, yalnızca düşünme adımı nedeniyle biraz daha fazla token harcadı.
+> **Model adı hakkında not:** Varsayılan model `deepseek-flash`'tir. 2026-11-02'deki denemede `deepseek-chat` ve `deepseek-v4-flash` adlarının da aynı modele gittiği görüldü. Fark şu: `deepseek-chat` düşünme adımı olmadan çalışıyor ve DeepSeek'in değişiklik günlüğüne göre kaldırılması planlanıyor.
+>
+> | Model (Hard Mode, 60 dk boş zaman, 1 hafta) | Süre | Token | Günlük toplam süre |
+> |---|---|---|---|
+> | `deepseek-flash` | 57 sn | 12.897 | 55-60 dk |
+> | `deepseek-chat` | 19 sn | 5.501 | 64-139 dk |
+>
+> Düşünme adımı çıktıyı daha pahalı ve yavaş yapıyor ama süre kuralına çok daha iyi uyuyor. Üretim haftada yalnızca bir kez yapılır. Beklemek istemezseniz ekrandaki **Beklemeden başla** düğmesi o haftayı hazır havuzla başlatır.
 >
 > Aynı denemede DeepSeek, GitHub Pages kökeninden gelen isteklere CORS izni verdi. Bu nedenle proxy büyük olasılıkla gerekmez.
 

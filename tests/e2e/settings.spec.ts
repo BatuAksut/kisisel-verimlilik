@@ -25,7 +25,7 @@ test('anahtar girilince görevler yapay zekâdan gelir, istek doğru biçimdedir
   expect(requests).toHaveLength(1);
   expect(requests[0].url).toBe('https://api.deepseek.com/chat/completions');
   expect(requests[0].auth).toBe('Bearer test-anahtari');
-  expect(requests[0].body.model).toBe('deepseek-chat');
+  expect(requests[0].body.model).toBe('deepseek-flash');
   expect(requests[0].body.response_format).toEqual({ type: 'json_object' });
 });
 

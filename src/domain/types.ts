@@ -117,6 +117,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   id: 'app',
   apiKey: '',
   baseUrl: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  model: 'deepseek-flash',
   proxyUrl: '',
 };

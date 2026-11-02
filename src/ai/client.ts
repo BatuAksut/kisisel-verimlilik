@@ -23,7 +23,11 @@ export interface ChatOptions {
   fetchImpl?: typeof fetch;
 }
 
-const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_TIMEOUT_MS = 240_000;
+// Düşünme modundaki modeller bütçenin büyük kısmını muhakemeye harcar. Bu kadar yüksek bir sınırı
+// kabul etmeyen sağlayıcılar için istek bir kez düşük sınırla tekrarlanır.
+const DEFAULT_MAX_TOKENS = 24_000;
+const FALLBACK_MAX_TOKENS = 8_000;
 const trimSlash = (url: string) => url.trim().replace(/\/+$/, '');
 
 export function isAiConfigured(config: AiConfig): boolean {
@@ -65,7 +69,7 @@ async function requestOnce(config: AiConfig, messages: ChatMessage[], options: C
         model: config.model.trim(),
         messages,
         response_format: { type: 'json_object' },
-        max_tokens: options.maxTokens ?? 8000,
+        max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
         temperature: 0.8,
         stream: false,
       }),
@@ -93,11 +97,15 @@ async function requestOnce(config: AiConfig, messages: ChatMessage[], options: C
   if (!response.ok) throw new AiError('http', `Sunucu hata döndürdü (HTTP ${response.status}).`);
 
   let content: unknown;
+  let finishReason: unknown;
   try {
-    content = JSON.parse(bodyText)?.choices?.[0]?.message?.content;
+    const choice = JSON.parse(bodyText)?.choices?.[0];
+    content = choice?.message?.content;
+    finishReason = choice?.finish_reason;
   } catch {
     throw new AiError('invalid', 'Sunucu yanıtı JSON değil.');
   }
+  if (finishReason === 'length') throw new AiError('invalid', 'Model yanıtı token sınırına takılıp yarıda kesildi.');
   if (typeof content !== 'string' || content.trim() === '') {
     throw new AiError('invalid', 'Model boş yanıt döndürdü.');
   }
@@ -146,12 +154,17 @@ export async function chatJson<T>(
   if (!isAiConfigured(config)) throw new AiError('config', 'API anahtarı, adres veya model eksik.');
 
   let attemptMessages = messages;
+  let maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
   for (let attempt = 1; ; attempt++) {
     try {
-      const content = await requestOnce(config, attemptMessages, options);
+      const content = await requestOnce(config, attemptMessages, { ...options, maxTokens });
       return parseContent(content, schema);
     } catch (error) {
       const aiError = error instanceof AiError ? error : new AiError('invalid', String(error));
+      if (attempt < 2 && aiError.kind === 'request' && maxTokens > FALLBACK_MAX_TOKENS) {
+        maxTokens = FALLBACK_MAX_TOKENS;
+        continue;
+      }
       if (attempt >= 2 || !RETRYABLE.includes(aiError.kind)) throw aiError;
       if (aiError.kind === 'invalid') {
         attemptMessages = [

@@ -91,15 +91,29 @@ describe('chatJson', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('geçersiz model hatasında yeniden denemez, sağlayıcının mesajını gösterir', async () => {
-    const fetchImpl = fakeFetch(
-      new Response(JSON.stringify({ error: { message: 'Model Not Exist' } }), { status: 400 }),
-    );
-    const error = await errorOf(chatJson(config, messages, schema, { fetchImpl }));
+  it('reddedilen istekte sağlayıcının mesajını gösterir', async () => {
+    const rejected = () => new Response(JSON.stringify({ error: { message: 'Model Not Exist' } }), { status: 400 });
+    const fetchImpl = fakeFetch(rejected());
+    const error = await errorOf(chatJson(config, messages, schema, { fetchImpl, maxTokens: 500 }));
     expect(error?.kind).toBe('request');
     expect(error?.message).toContain('Model adı');
     expect(error?.message).toContain('Model Not Exist');
     expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('yüksek token sınırı reddedilirse bir kez düşük sınırla dener', async () => {
+    const fetchImpl = fakeFetch(new Response('{}', { status: 400 }), reply('{"ok":true}'));
+    await expect(chatJson(config, messages, schema, { fetchImpl })).resolves.toEqual({ ok: true });
+    expect(bodyOf(fetchImpl, 0).max_tokens).toBe(24_000);
+    expect(bodyOf(fetchImpl, 1).max_tokens).toBe(8_000);
+  });
+
+  it('token sınırına takılan yanıtı geçersiz sayıp yeniden dener', async () => {
+    const cut = () =>
+      new Response(JSON.stringify({ choices: [{ finish_reason: 'length', message: { content: '{"ok":tr' } }] }));
+    const fetchImpl = fakeFetch(cut(), reply('{"ok":true}'));
+    await expect(chatJson(config, messages, schema, { fetchImpl })).resolves.toEqual({ ok: true });
+    expect(bodyOf(fetchImpl, 1).messages.at(-1).content).toContain('yarıda kesildi');
   });
 
   it('ağ hatasında ve 5xx te bir kez yeniden dener', async () => {

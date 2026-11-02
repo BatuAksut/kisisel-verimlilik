@@ -35,7 +35,7 @@ describe('dışa ve içe aktarma', () => {
     await db.profile.put({ id: 'me', answers, difficulty: 'normal', startDate: '2026-03-02', createdAt: 1 });
     const text = JSON.stringify(await createBackup(false));
     expect(text).not.toContain('gizli-anahtar');
-    expect(text).toContain('deepseek-chat');
+    expect(text).toContain('deepseek-flash');
   });
 
   it('açıkça istenirse anahtar yedeğe girer', async () => {
