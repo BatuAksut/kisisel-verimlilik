@@ -9,6 +9,9 @@ import type { AppSettings, Profile, Quest, QuestBlueprint, QuestSource, SpareQue
 import type { PlanInput, PlannedWeek } from './plan';
 import { buildPoolWeek, poolBaseId } from './selector';
 
+/** Görev içeriği köklü biçimde değişince artırılır; süren haftanın görevleri yenilenir. */
+export const QUEST_VERSION = 2;
+
 export function questUsage(quests: Pick<Quest, 'id'>[]): Map<string, number> {
   const usage = new Map<string, number>();
   for (const quest of quests) {
@@ -41,6 +44,7 @@ async function buildPlanInput(profile: Profile, weekNumber: number, days: number
     intensity: summary?.intensity ?? 'koru',
     usage: questUsage(quests),
     seed: profile.createdAt % 100_000 + weekNumber * 7919,
+    habitSeed: profile.createdAt % 100_000,
   };
 }
 
@@ -155,6 +159,7 @@ export async function saveWeekPlan(
       generatedAt: Date.now(),
       lastAiAttemptAt: meta.attemptedAt,
       lastError: meta.error,
+      questVersion: QUEST_VERSION,
     });
   });
 }

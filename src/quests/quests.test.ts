@@ -5,7 +5,7 @@ import { AREAS, STAT_KEYS, type Difficulty } from '../domain/types';
 import { applySafety } from './generator';
 import { MAIN_COUNT, SIDE_COUNT, type PlanInput } from './plan';
 import { POOL, POOL_THEMES } from './pool';
-import { buildPoolWeek, pickPoolSide, tierRange } from './selector';
+import { buildPoolWeek, habitsForDay, pickPoolSide, tierRange } from './selector';
 
 function input(overrides: Partial<PlanInput> = {}): PlanInput {
   return {
@@ -17,6 +17,7 @@ function input(overrides: Partial<PlanInput> = {}): PlanInput {
     intensity: 'koru',
     usage: new Map(),
     seed: 42,
+    habitSeed: 7,
     ...overrides,
   };
 }
@@ -37,7 +38,9 @@ describe('hazır görev havuzu', () => {
   it('en az 60 görev içerir ve her alanda görev vardır', () => {
     expect(POOL.length).toBeGreaterThanOrEqual(60);
     for (const area of AREAS) {
-      expect(POOL.filter((quest) => quest.type === 'main' && quest.area === area).length).toBeGreaterThanOrEqual(6);
+      // Su konusunda kanıtlı davranış az; sayı tamamlamak için zayıf görev eklenmez.
+      const minimum = area === 'su' ? 4 : 6;
+      expect(POOL.filter((quest) => quest.type === 'main' && quest.area === area).length).toBeGreaterThanOrEqual(minimum);
       expect(POOL.some((quest) => quest.type === 'side' && quest.area === area)).toBe(true);
     }
     expect(POOL.filter((quest) => quest.type === 'boss').length).toBeGreaterThanOrEqual(POOL_THEMES.length);
@@ -55,6 +58,16 @@ describe('hazır görev havuzu', () => {
         expect(quest.estimatedMinutes, quest.title).toBeLessThanOrEqual(30);
       }
     }
+  });
+
+  it('ana görevler ve Bosslar kaynaklı gerekçe taşır, tek seferlik ayar işi içermez', () => {
+    for (const quest of POOL.filter((item) => item.type !== 'side')) {
+      expect(quest.why, quest.title).toMatch(/[\p{L}-]+ \d{4}\)/u);
+      expect(quest.why!.length, quest.title).toBeLessThanOrEqual(200);
+    }
+    for (const quest of POOL.filter((item) => item.type === 'side')) expect(quest.why, quest.title).toBeUndefined();
+    const titles = POOL.filter((quest) => quest.type === 'main').map((quest) => quest.title);
+    expect(titles.filter((title) => /bildirim|alarm|8 bardak|su şişesi/i.test(title))).toEqual([]);
   });
 
   it('kendi güvenlik filtresine takılmaz', () => {
@@ -93,6 +106,28 @@ describe('havuzdan hafta kurma', () => {
     const plan = buildPoolWeek(input({ focusAreas: ['ekran'] }));
     const ekranDays = plan.days.filter((day) => day.main.some((quest) => quest.area === 'ekran')).length;
     expect(ekranDays).toBeGreaterThanOrEqual(5);
+  });
+
+  it('çekirdek alışkanlık evre boyunca her gün tekrar eder, evre değişince zorlaşır', () => {
+    const base = (id: string) => id.split('@')[0];
+    const habitIds = (plan: ReturnType<typeof buildPoolWeek>, index: number) =>
+      plan.days[index].main.filter((quest) => quest.habit).map((quest) => base(quest.id));
+
+    const week = buildPoolWeek(input({ focusAreas: ['hareket', 'zihin'] }));
+    expect(habitIds(week, 0)).toHaveLength(2);
+    for (let index = 1; index < week.days.length; index++) expect(habitIds(week, index)).toEqual(habitIds(week, 0));
+
+    const nextWeek = buildPoolWeek(input({ focusAreas: ['hareket', 'zihin'], weekNumber: 2, seed: 99, days: [8, 9] }));
+    expect(habitIds(nextWeek, 0)).toEqual(habitIds(week, 0));
+
+    const later = buildPoolWeek(input({ focusAreas: ['hareket', 'zihin'], weekNumber: 8, days: [50], freeMinutes: 120 }));
+    const tiers = habitIds(later, 0).map((id) => POOL.find((quest) => quest.id === id)!.tier);
+    expect(tiers).toEqual([3, 3]);
+  });
+
+  it('su çekirdek alışkanlık olmaz ve alışkanlık boş zamanı aşmaz', () => {
+    expect(habitsForDay(input({ focusAreas: ['su'] }), 1).map((quest) => quest.area)).toEqual(['uyku', 'hareket']);
+    expect(habitsForDay(input({ freeMinutes: 15, focusAreas: ['ogrenme'], difficulty: 'hard' }), 50)).toEqual([]);
   });
 
   it('önceden az kullanılan Boss görevini seçer', () => {
@@ -198,6 +233,14 @@ describe('yapay zekâ görev şeması', () => {
     const tooFew = structuredClone(validPlan);
     tooFew.days[0].main = tooFew.days[0].main.slice(0, 2);
     expect(weekPlanSchema([1, 2]).safeParse(tooFew).success).toBe(false);
+  });
+
+  it('gerekçeyi ana görevde ve Bossta tutar, yan görevde atar', () => {
+    const task = rawTask({ why: 'Kendini sınamak kalıcılığı artırır.', habit: true });
+    expect(normalizeTask(task, 'main', 'x')).toMatchObject({ why: task.why, habit: true });
+    expect(normalizeTask(task, 'boss', 'x')).toMatchObject({ why: task.why, habit: undefined });
+    expect(normalizeTask(task, 'side', 'x')).toMatchObject({ why: undefined, habit: undefined });
+    expect(normalizeTask(rawTask(), 'main', 'x').why).toBeUndefined();
   });
 
   it('özellik puanı vermeyen görevi reddeder', () => {

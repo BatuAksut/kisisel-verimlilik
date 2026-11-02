@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, saveSettings } from '../db/database';
 import type { OnboardingAnswers, Profile } from '../domain/types';
 import { rerollSideQuest, toggleQuest } from './actions';
+import { QUEST_VERSION } from './generator';
 import { aiSettled, syncProgram, upgradePoolWeek } from './sync';
 
 const answers: OnboardingAnswers = {
@@ -206,6 +207,41 @@ describe('havuz haftasını yükseltme', () => {
     expect((await questsOn(4)).every((quest) => quest.source === 'ai')).toBe(true);
     expect((await questsOn(7)).filter((quest) => quest.type === 'boss')).toHaveLength(1);
     expect((await db.weeks.get(1))?.source).toBe('ai');
+  });
+
+  it('eski sürüm görevler yenilenir, başlanmış güne ve geçmişe dokunulmaz', async () => {
+    await createProfile();
+    await syncProgram(onDay(2));
+    await aiSettled();
+    await toggleQuest((await questsOn(2))[0].id, 2);
+    await db.weeks.update(1, { questVersion: undefined });
+    const todayBefore = await questsOn(2);
+    await db.quests.where('dayNumber').equals(3).modify({ title: 'Eski görev' });
+
+    await syncProgram(onDay(2));
+    await aiSettled();
+
+    expect(await questsOn(2)).toEqual(todayBefore);
+    expect((await questsOn(3)).some((quest) => quest.title === 'Eski görev')).toBe(false);
+    expect((await questsOn(3)).length).toBeGreaterThan(0);
+    expect((await db.weeks.get(1))?.questVersion).toBe(QUEST_VERSION);
+  });
+
+  it('eski sürümde bugüne başlanmadıysa bugün de yenilenir, sonra tekrar yenilenmez', async () => {
+    await createProfile();
+    await syncProgram(onDay(2));
+    await aiSettled();
+    await db.weeks.update(1, { questVersion: 1 });
+    await db.quests.where('dayNumber').equals(2).modify({ title: 'Eski görev' });
+
+    await syncProgram(onDay(2));
+    await aiSettled();
+    expect((await questsOn(2)).some((quest) => quest.title === 'Eski görev')).toBe(false);
+
+    await db.quests.where('dayNumber').equals(2).modify({ title: 'Yeni görev' });
+    await syncProgram(onDay(2));
+    await aiSettled();
+    expect((await questsOn(2)).every((quest) => quest.title === 'Yeni görev')).toBe(true);
   });
 
   it('bugüne dokunulmadıysa bugünün görevlerini de değiştirir', async () => {

@@ -20,6 +20,8 @@ const blueprint = {
   xp: z.number(),
   estimatedMinutes: z.number(),
   type: z.enum(['main', 'side', 'boss']),
+  why: z.string().optional(),
+  habit: z.boolean().optional(),
 };
 
 const backupSchema = z.object({
@@ -55,6 +57,7 @@ const backupSchema = z.object({
       generatedAt: z.number(),
       lastAiAttemptAt: z.number().optional(),
       lastError: z.string().optional(),
+      questVersion: z.number().optional(),
     }),
   ),
   days: z.array(

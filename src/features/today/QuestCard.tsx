@@ -58,6 +58,7 @@ function Burst() {
 
 export function QuestCard({ quest, onToggle, onReroll, rerollUsed, index = 0 }: QuestCardProps) {
   const [justDone, setJustDone] = useState(false);
+  const [showWhy, setShowWhy] = useState(false);
   const done = quest.status === 'done';
   const missed = quest.status === 'missed';
   const area = AREA_STYLES[quest.area];
@@ -88,6 +89,12 @@ export function QuestCard({ quest, onToggle, onReroll, rerollUsed, index = 0 }: 
           <PixelIcon name={missed ? 'cross' : 'check'} size={16} className={missed ? 'text-rose' : ''} />
         </span>
         <span className="min-w-0 flex-1">
+          {quest.habit && (
+            <span className="mb-1 inline-flex items-center gap-1 font-pixel text-xs text-orchid">
+              <PixelIcon name="flame" size={11} />
+              Çekirdek alışkanlık
+            </span>
+          )}
           <span className={`block font-semibold leading-snug ${done ? 'text-muted line-through' : ''}`}>{quest.title}</span>
           <span className="mt-1 block text-sm leading-snug text-muted">{quest.description}</span>
           <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -113,6 +120,21 @@ export function QuestCard({ quest, onToggle, onReroll, rerollUsed, index = 0 }: 
           {quest.xp} XP
         </span>
       </button>
+
+      {quest.why && (
+        <div className="border-t-2 border-ink-soft px-3 py-1 pl-4">
+          <button
+            type="button"
+            aria-expanded={showWhy}
+            onClick={() => setShowWhy(!showWhy)}
+            className="inline-flex min-h-9 items-center gap-1.5 font-pixel text-sm text-amber"
+          >
+            <PixelIcon name="book" size={14} />
+            Neden işe yarar?
+          </button>
+          {showWhy && <p className="animate-rise pb-2 text-sm leading-snug text-muted">{quest.why}</p>}
+        </div>
+      )}
 
       {done && justDone && <Burst key={`burst-${quest.completedAt}`} />}
       {done && justDone && (

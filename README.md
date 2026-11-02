@@ -129,6 +129,15 @@ Otomatik testler sahte API yanıtlarıyla ve masaüstü Chromium'da çalışır.
 | Yapay zekâ başarısızsa | Hatalı yanıtta bir kez yeniden denenir, olmazsa havuz görevleri kalır ve ekranda nedeni yazar. **Yeniden dene** ile hemen, yoksa en erken bir saat sonra uygulama açıldığında yeniden denenir. |
 | Güvenlik | Model kurallarla sınırlanır. Yine de oruç, kalori, diyet, ilaç gibi ifadeler içeren görevler atılır, yerine havuzdan görev gelir. |
 
+## Görevlerin dayanağı
+
+Ana görevler tek seferlik ayar işi değil, etkisi araştırılmış davranışlardır. Her kartta **Neden işe yarar?** ile etkinin ne olduğu ve kanıtın ne kadar güçlü olduğu okunur.
+
+- **Hazır havuz:** Atıflar `src/quests/pool.ts` içindedir ve varlıkları 2026-11-02'de Crossref'te kontrol edildi. Bu kontrol makalenin var olduğunu gösterir; özetler yazıldıkları dönemin bilgisine dayanır.
+- **Yapay zekâ:** Kanıtlı yöntemler listesinden seçip kişiye uyarlar. Uydurma atıf riskine karşı kaynak yazması yasaktır, yalnızca mekanizmayı anlatır.
+- **Çekirdek alışkanlık:** 1-2 görev evre boyunca her gün tekrar eder ve evre değişince zorlaşır, çünkü alışkanlık aynı davranışın aynı bağlamda tekrarıyla oluşur (Lally 2010). Programın 66 günü de bu çalışmadaki medyan süreden gelir; kişiden kişiye 18-254 gün arasında değişir.
+- **Sınır:** Bulgular genel nüfus ortalamalarıdır, tıbbi tavsiye değildir. Sağlık sorunun varsa hareket ve beslenme görevlerini hekiminle konuş.
+
 ## Klasör yapısı
 
 ```text

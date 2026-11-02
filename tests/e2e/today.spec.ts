@@ -104,6 +104,18 @@ test('Boss görevi haftanın son gününde çıkar', async ({ page }) => {
   await expect(questButtons(page, 'Boss görevi')).toHaveCount(1);
 });
 
+test('ana görev gerekçesi açılır, görevi işaretlemez, yan görevde gerekçe olmaz', async ({ page }) => {
+  await completeOnboarding(page);
+  const mains = page.getByRole('region', { name: 'Ana görevler' });
+  await expect(mains.getByText('Çekirdek alışkanlık').first()).toBeVisible();
+  const toggle = mains.getByRole('button', { name: 'Neden işe yarar?' }).first();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(mains.getByText(/\d{4}\)/).first()).toBeVisible();
+  await expect(questButtons(page, 'Ana görevler').first()).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByRole('region', { name: 'Yan görevler' }).getByRole('button', { name: 'Neden işe yarar?' })).toHaveCount(0);
+});
+
 test('gün kazanılınca kutlama çıkar ve dokunmayı engellemez, açılışta tekrar etmez', async ({ page }) => {
   await completeOnboarding(page);
   const mains = questButtons(page, 'Ana görevler');

@@ -4,7 +4,7 @@ import { dayNumberFor, toDateKey } from '../domain/dates';
 import { daysOfWeek, TOTAL_DAYS, weekOfDay } from '../domain/program';
 import { isDayUntouched, missingDayRecords, overdueQuestIds } from '../domain/reset';
 import type { AppSettings, Profile } from '../domain/types';
-import { buildWeek, saveWeekPlan } from './generator';
+import { buildWeek, QUEST_VERSION, saveWeekPlan } from './generator';
 
 const AI_RETRY_MS = 60 * 60 * 1000;
 
@@ -131,11 +131,18 @@ async function runSync(now: Date): Promise<void> {
     db.weeks.get(weekNumber),
     db.quests.where('dayNumber').equals(todayNumber).count(),
   ]);
-  if (!week || todayCount === 0) {
-    // Görevler önce havuzdan kurulur: uygulama ağ isteğini beklemeden her zaman kullanılabilir.
-    const days = daysOfWeek(weekNumber).filter((day) => day >= todayNumber);
-    const { plan } = await buildWeek(profile, settings, weekNumber, days, false);
-    await saveWeekPlan(weekNumber, plan, 'pool', todayNumber, {});
+  const outdated = week !== undefined && week.questVersion !== QUEST_VERSION;
+  if (!week || todayCount === 0 || outdated) {
+    // Eski içerik yenilenirken kullanıcının başladığı güne dokunulmaz.
+    const fromDay = outdated && todayCount > 0 && !(await isTodayUntouched(todayNumber)) ? todayNumber + 1 : todayNumber;
+    const days = daysOfWeek(weekNumber).filter((day) => day >= fromDay);
+    if (days.length > 0) {
+      // Görevler önce havuzdan kurulur: uygulama ağ isteğini beklemeden her zaman kullanılabilir.
+      const { plan } = await buildWeek(profile, settings, weekNumber, days, false);
+      await saveWeekPlan(weekNumber, plan, 'pool', fromDay, {});
+    } else {
+      await db.weeks.update(weekNumber, { questVersion: QUEST_VERSION });
+    }
   }
   void upgradePoolWeek(now).catch(console.error);
 }

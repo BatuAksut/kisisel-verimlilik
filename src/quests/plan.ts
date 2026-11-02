@@ -4,6 +4,8 @@ import type { Area, Difficulty, QuestBlueprint } from '../domain/types';
 export const MAIN_COUNT: Record<Difficulty, number> = { kolay: 3, normal: 4, hard: 5 };
 export const SIDE_COUNT: Record<Difficulty, number> = { kolay: 1, normal: 2, hard: 2 };
 export const SPARE_SIDE_COUNT = 3;
+/** Her gün tekrarlanan çekirdek alışkanlık sayısı: alışkanlık aynı davranışın tekrarıyla oluşur. */
+export const HABIT_COUNT: Record<Difficulty, number> = { kolay: 1, normal: 2, hard: 2 };
 
 export interface PlannedDay {
   day: number;
@@ -29,4 +31,6 @@ export interface PlanInput {
   /** Havuz görevi kimlikleri ve şimdiye kadar kaç kez kullanıldıkları. */
   usage: Map<string, number>;
   seed: number;
+  /** Haftadan bağımsız tohum: çekirdek alışkanlıklar evre boyunca değişmesin. */
+  habitSeed: number;
 }

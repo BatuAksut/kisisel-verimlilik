@@ -1,7 +1,7 @@
 import type { Intensity } from '../domain/feedback';
-import { phaseOfDay } from '../domain/program';
-import type { QuestBlueprint } from '../domain/types';
-import { MAIN_COUNT, SIDE_COUNT, SPARE_SIDE_COUNT, type PlanInput, type PlannedWeek } from './plan';
+import { phaseOfDay, type Phase } from '../domain/program';
+import type { Area, QuestBlueprint } from '../domain/types';
+import { HABIT_COUNT, MAIN_COUNT, SIDE_COUNT, SPARE_SIDE_COUNT, type PlanInput, type PlannedWeek } from './plan';
 import { POOL, POOL_THEMES, type PoolQuest } from './pool';
 
 function mulberry32(seed: number): () => number {
@@ -32,8 +32,32 @@ export function poolBaseId(id: string): string {
   return id.split('@')[0];
 }
 
-function strip({ tier: _tier, ...blueprint }: PoolQuest, suffix: string): QuestBlueprint {
+function strip({ tier: _tier, repeatable: _repeatable, ...blueprint }: PoolQuest, suffix: string): QuestBlueprint {
   return { ...blueprint, id: `${blueprint.id}@${suffix}` };
+}
+
+const PHASE_TIER: Record<Phase['key'], PoolQuest['tier']> = { temel: 1, yukselis: 2, ustalik: 3 };
+
+/**
+ * Evre boyunca aynı kalan alışkanlıkları seçer, evre değişince zorlaşır. Önce kişinin odak alanlarına bakar.
+ * Su alanı hariç tutulur: orada en kanıtlı davranış tek bir değişikliktir, her gün izlenecek bir beceri değil.
+ */
+export function habitsForDay(input: Pick<PlanInput, 'difficulty' | 'focusAreas' | 'freeMinutes' | 'habitSeed'>, day: number): PoolQuest[] {
+  const phase = phaseOfDay(day).key;
+  const areas = [...new Set<Area>([...input.focusAreas.filter((area) => area !== 'su'), 'uyku', 'hareket', 'zihin'])];
+  const habits: PoolQuest[] = [];
+  let spent = 0;
+  for (const area of areas) {
+    if (habits.length === HABIT_COUNT[input.difficulty]) break;
+    const options = POOL.filter((quest) => quest.repeatable && quest.area === area && quest.tier === PHASE_TIER[phase]);
+    if (options.length === 0) continue;
+    const pick = options[input.habitSeed % options.length];
+    // Boş zaman azsa uzun bir alışkanlık günü tek başına doldurmasın.
+    if (spent + pick.estimatedMinutes > input.freeMinutes) continue;
+    habits.push(pick);
+    spent += pick.estimatedMinutes;
+  }
+  return habits;
 }
 
 export function buildPoolWeek(input: PlanInput): PlannedWeek {
@@ -60,9 +84,10 @@ export function buildPoolWeek(input: PlanInput): PlannedWeek {
     const count = MAIN_COUNT[input.difficulty];
     const sideCount = SIDE_COUNT[input.difficulty];
 
-    const chosen: PoolQuest[] = [];
-    const areas = new Set<string>();
-    let spent = 0;
+    const habits = habitsForDay(input, day);
+    const chosen: PoolQuest[] = [...habits];
+    const areas = new Set<string>(habits.map((quest) => quest.area));
+    let spent = habits.reduce((sum, quest) => sum + quest.estimatedMinutes, 0);
     // Önce boş zamana sığanlar seçilir; sığmazsa en kısa görevlerle sayı tamamlanır.
     for (const candidate of candidates) {
       if (chosen.length === count) break;
@@ -85,7 +110,7 @@ export function buildPoolWeek(input: PlanInput): PlannedWeek {
 
     return {
       day,
-      main: chosen.map((quest) => strip(quest, `d${day}`)),
+      main: chosen.map((quest) => ({ ...strip(quest, `d${day}`), habit: habits.includes(quest) || undefined })),
       side: sidesToday.map((quest) => strip(quest, `d${day}`)),
     };
   });

@@ -45,6 +45,10 @@ export interface QuestBlueprint {
   xp: number;
   estimatedMinutes: number;
   type: QuestType;
+  /** Görevin neden işe yaradığı ve kanıtın gücü. */
+  why?: string;
+  /** Evre boyunca her gün tekrarlanan çekirdek alışkanlık. */
+  habit?: boolean;
 }
 
 export interface Quest extends QuestBlueprint {
@@ -76,6 +80,8 @@ export interface WeekRecord {
   generatedAt: number;
   lastAiAttemptAt?: number;
   lastError?: string;
+  /** Görev içeriğinin sürümü. Eskiyse bu haftanın kalan görevleri yenilenir. */
+  questVersion?: number;
 }
 
 export interface Reflection {

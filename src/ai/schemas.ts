@@ -21,6 +21,8 @@ export const taskSchema = z.object({
   xp: z.number().positive(),
   estimatedMinutes: z.number().positive(),
   type: z.enum(['main', 'side', 'boss']),
+  why: z.string().trim().transform((text) => text.slice(0, 300)).optional(),
+  habit: z.boolean().optional(),
 });
 
 export type RawTask = z.infer<typeof taskSchema>;
@@ -84,6 +86,9 @@ export function normalizeTask(task: RawTask, type: QuestType, id: string): Quest
     xp,
     estimatedMinutes: Math.round(clamp(task.estimatedMinutes, MINUTES_RANGE[type])),
     type,
+    // Yan görevler eğlence içindir, gerekçe ve alışkanlık etiketi yalnızca ana görev ve Boss'ta anlamlıdır.
+    why: type === 'side' ? undefined : task.why || undefined,
+    habit: type === 'main' ? task.habit || undefined : undefined,
   };
 }
 
