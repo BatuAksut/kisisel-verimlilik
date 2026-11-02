@@ -142,6 +142,13 @@ describe('güvenlik filtresi', () => {
     expect(isSafeQuest({ title: '21:00’den sonra telefonu başka odaya koy', description: 'Sabaha kadar getirme.' })).toBe(true);
   });
 
+  it('ekran detoksunu geçirir, yiyecek detoksunu reddeder', () => {
+    expect(isSafeQuest({ title: 'Haftalık Odak ve Ekran Detoksu', description: '2 saat telefonsuz kal.' })).toBe(true);
+    expect(isSafeQuest({ title: 'Dijital detoks', description: 'Bildirimleri kapat.' })).toBe(true);
+    expect(isSafeQuest({ title: 'Detoks suyu iç', description: 'Bütün gün.' })).toBe(false);
+    expect(isSafeQuest({ title: 'Ekran detoksu ve oruç', description: '' })).toBe(false);
+  });
+
   it('güvensiz görevleri havuz göreviyle değiştirir', () => {
     const fallback = buildPoolWeek(input({ days: [1] }));
     const plan = {

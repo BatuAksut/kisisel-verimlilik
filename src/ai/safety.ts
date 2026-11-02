@@ -23,7 +23,10 @@ const FORBIDDEN = [
   'nefesini tut',
 ];
 
+// "Detoks" yiyecekle ilgiliyse yasak, ekran detoksu gibi kullanımlar ise zararsız bir alışkanlık görevidir.
+const HARMLESS_DETOX = /(dijital|ekran|telefon|sosyal medya|internet)\s+detoks/g;
+
 export function isSafeQuest(quest: Pick<QuestBlueprint, 'title' | 'description'>): boolean {
-  const text = `${quest.title} ${quest.description}`.toLocaleLowerCase('tr');
+  const text = `${quest.title} ${quest.description}`.toLocaleLowerCase('tr').replace(HARMLESS_DETOX, '');
   return !FORBIDDEN.some((phrase) => text.includes(phrase));
 }

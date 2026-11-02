@@ -7,10 +7,11 @@ export const SYSTEM_PROMPT = `Sen Quest66 adlı, 66 günlük oyunlaştırılmı�
 
 GÖREV KURALLARI
 - Görevler somut ve ölçülebilir olmalı. "Daha az telefon" değil, "21:00'den sonra telefonu başka odaya koy" gibi yaz.
-- Süreler gerçekçi olmalı; kişinin günlük boş zamanını aşma.
+- Süreler gerçekçi olmalı. Bir günün ana ve yan görevlerinin estimatedMinutes toplamı, kişinin gunlukBosDakika değerini geçmemeli. Zaman az, görev çoksa görevleri 2-10 dakikalık tut.
+- Telefonu başka odaya koymak gibi gün akışını bozmayan görevlerde estimatedMinutes olarak beklenen süreyi değil, gerçekten harcanan süreyi yaz.
 - Zorluk haftadan haftaya kademeli artmalı. Önceki haftanın tamamlama verisine uy: "azalt" ise görevleri kısalt ve kolaylaştır, "koru" ise aynı seviyede kal, "artir" ise biraz zorlaştır.
 - Ana görevler alışkanlık kazandırmalı, günler arasında tekrar edebilir.
-- Yan görevler eğlenceli, beklenmedik ve kişiye özel olmalı, 5-30 dakika sürmeli. Kişinin ilgi alanlarından yararlan.
+- Yan görevler eğlenceli, beklenmedik ve kişiye özel olmalı, 5-30 dakika sürmeli. Kişinin ilgi alanlarından yararlan, ama hafta içinde hiçbir yan görev fikri tekrar etmesin; aynı ilgi alanını her seferinde farklı bir fikirle kullan.
 - Boss görevi haftanın temasına uygun, normal görevlerden belirgin biçimde büyük ama bir günde bitirilebilir olmalı.
 
 GÜVENLİK
@@ -69,6 +70,7 @@ export function buildWeekPrompt(input: WeekPromptInput): string {
 
 - "days" dizisinde tam olarak şu günler olsun: ${input.days.join(', ')}.
 - Her günde tam ${MAIN_COUNT[input.difficulty]} ana görev ve ${SIDE_COUNT[input.difficulty]} yan görev olsun.
+- Boss hariç, her günün görevlerinin toplam süresi en fazla ${input.answers.freeMinutes} dakika olsun.
 - Bir Boss görevi üret ("boss" alanı, ${bossDayOfWeek(input.weekNumber)}. günde çıkacak).
 - Kişi yan görevini değiştirmek isterse diye "spareSide" alanında ${SPARE_SIDE_COUNT} yedek yan görev üret.
 

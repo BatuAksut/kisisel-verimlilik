@@ -49,7 +49,9 @@ Hata alırsanız:
 | Yeterli bakiye yok | Sağlayıcı hesabına bakiye yükleyin |
 | Sunucuya ulaşılamadı, CORS engeli olabilir | [Proxy'yi](proxy/README.md) kurup adresini **Proxy URL** alanına yazın |
 
-> **Model adı hakkında not:** Varsayılan model `deepseek-chat`'tir. DeepSeek'in değişiklik günlüğü bu adın 2026-07-24'te kaldırılacağını söylüyor, güncel belgeler ise `deepseek-flash` adını kullanıyor. Test sırasında gerçek bir anahtar kullanılmadığı için eski adın hâlâ çalışıp çalışmadığı denenmedi.
+> **Model adı hakkında not:** Varsayılan model `deepseek-chat`'tir. DeepSeek'in değişiklik günlüğü bu adın 2026-07-24'te kaldırılacağını söylüyor, güncel belgeler ise `deepseek-flash` adını kullanıyor. 2026-11-02'de yapılan denemede `deepseek-chat` hâlâ yanıt verdi ve isteği `deepseek-flash` karşıladı, ama her an kapatılabilir. Model hatası alırsanız **Model** alanına `deepseek-flash` yazın. O da aynı denemede çalıştı, yalnızca düşünme adımı nedeniyle biraz daha fazla token harcadı.
+>
+> Aynı denemede DeepSeek, GitHub Pages kökeninden gelen isteklere CORS izni verdi. Bu nedenle proxy büyük olasılıkla gerekmez.
 
 Başka bir OpenAI uyumlu sağlayıcıya geçmek için **Base URL**, **Model** ve **API anahtarı** alanlarını değiştirmeniz yeterlidir. İstekler `<Base URL>/chat/completions` adresine gider ve sağlayıcının `response_format: json_object` desteklemesi gerekir.
 
