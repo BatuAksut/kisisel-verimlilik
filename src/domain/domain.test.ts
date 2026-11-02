@@ -9,6 +9,7 @@ import {
   isDaySuccessful,
   levelFromXp,
   MAX_FREEZES,
+  rankForLevel,
   totalXpAtLevel,
 } from './progress';
 import { REMINDER_INTERVAL_MS, shouldRemind } from './reminders';
@@ -128,6 +129,13 @@ describe('XP ve seviye', () => {
     expect(totalXpAtLevel(3)).toBe(225);
     expect(levelFromXp(224)).toBe(2);
     expect(levelFromXp(225)).toBe(3);
+  });
+
+  it('seviyeye göre unvan verir', () => {
+    expect(rankForLevel(1)).toBe('Çırak');
+    expect(rankForLevel(5)).toBe('Kâşif');
+    expect(rankForLevel(19)).toBe('Usta');
+    expect(rankForLevel(40)).toBe('Efsane');
   });
 
   it('XP ve özellik puanlarını yalnızca tamamlanan görevlerden toplar', () => {
@@ -257,6 +265,7 @@ describe('Hard Mode cezası', () => {
     const progress = computeProgress(days, quests, 2);
     expect(progress.totalXp).toBe(40);
     expect(progress.penaltyTotal).toBe(10);
+    expect(progress.penalties).toEqual({ 1: 10 });
     expect(progress.stats.guc).toBe(50);
   });
 

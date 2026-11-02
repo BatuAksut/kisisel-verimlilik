@@ -51,7 +51,20 @@ export interface Progress {
   bestStreak: number;
   freezes: number;
   penaltyTotal: number;
+  penalties: Record<number, number>;
   outcomes: Record<number, DayOutcome>;
+}
+
+const RANKS: { minLevel: number; name: string }[] = [
+  { minLevel: 20, name: 'Efsane' },
+  { minLevel: 15, name: 'Usta' },
+  { minLevel: 10, name: 'Savaşçı' },
+  { minLevel: 5, name: 'Kâşif' },
+  { minLevel: 1, name: 'Çırak' },
+];
+
+export function rankForLevel(level: number): string {
+  return RANKS.find((rank) => level >= rank.minLevel)!.name;
 }
 
 /**
@@ -61,6 +74,7 @@ export interface Progress {
 export function computeProgress(days: DayRecord[], quests: Quest[], todayNumber: number): Progress {
   const stats = Object.fromEntries(STAT_KEYS.map((key) => [key, 0])) as Record<StatKey, number>;
   const outcomes: Record<number, DayOutcome> = {};
+  const penalties: Record<number, number> = {};
   const questsByDay = new Map<number, Quest[]>();
   for (const quest of quests) {
     const list = questsByDay.get(quest.dayNumber);
@@ -98,6 +112,7 @@ export function computeProgress(days: DayRecord[], quests: Quest[], todayNumber:
         const applied = Math.min(penalty, totalXp - floor);
         totalXp -= applied;
         penaltyTotal += applied;
+        if (applied > 0) penalties[day.dayNumber] = applied;
       }
       if (successful) {
         streak++;
@@ -125,6 +140,7 @@ export function computeProgress(days: DayRecord[], quests: Quest[], todayNumber:
     bestStreak,
     freezes,
     penaltyTotal,
+    penalties,
     outcomes,
   };
 }

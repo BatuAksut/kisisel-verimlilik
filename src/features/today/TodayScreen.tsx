@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link } from 'wouter';
 import { PixelIcon } from '../../components/PixelIcon';
 import { db, getSettings } from '../../db/database';
@@ -9,6 +9,8 @@ import type { Profile, Quest } from '../../domain/types';
 import { remindPendingQuests } from '../../notifications/notifications';
 import { rerollSideQuest, toggleQuest } from '../../quests/actions';
 import { skipAiWait, syncStatus } from '../../quests/sync';
+import { useProgress } from '../useProgram';
+import { HeroBar, LevelUpToast, YesterdayNotice } from './HeroBar';
 import { NotificationPrompt } from './NotificationPrompt';
 import { QuestCard } from './QuestCard';
 import { ReflectionCard } from './ReflectionCard';
@@ -102,6 +104,21 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
     // Yalnızca gün değişince veya görevler ilk yüklendiğinde hatırlatır, her işaretlemede değil.
   }, [hasQuests, todayNumber]);
 
+  // Seviye atlama yalnızca bu ekranda bir görev bitince kutlanır, açılışta değil.
+  const progress = useProgress(todayNumber);
+  const previousLevel = useRef<number | null>(null);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
+  useEffect(() => {
+    if (!progress) return;
+    if (previousLevel.current !== null && progress.level > previousLevel.current) setLevelUp(progress.level);
+    previousLevel.current = progress.level;
+  }, [progress]);
+  useEffect(() => {
+    if (levelUp === null) return;
+    const timer = setTimeout(() => setLevelUp(null), 2500);
+    return () => clearTimeout(timer);
+  }, [levelUp]);
+
   const handleToggle = useCallback((quest: Quest) => void toggleQuest(quest.id, todayNumber), [todayNumber]);
   const handleReroll = useCallback((quest: Quest) => void rerollSideQuest(quest.id, todayNumber), [todayNumber]);
 
@@ -138,6 +155,7 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
 
   return (
     <div className="space-y-5">
+      {levelUp !== null && <LevelUpToast level={levelUp} />}
       <header>
         <p className="font-pixel text-sm text-muted">
           {phase.name} evresi · {weekOfDay(todayNumber)}. hafta{week ? `: ${week.theme}` : ''}
@@ -146,6 +164,9 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
           Gün <span className="text-amber">{todayNumber}</span> / {TOTAL_DAYS}
         </h1>
       </header>
+
+      {progress && <HeroBar progress={progress} />}
+      {progress && <YesterdayNotice progress={progress} todayNumber={todayNumber} />}
 
       {quests.length === 0 ? (
         <GeneratingCard generating={generating} />

@@ -5,6 +5,7 @@ import { BottomNav } from './components/BottomNav';
 import { db } from './db/database';
 import type { Profile } from './domain/types';
 import { Onboarding } from './features/onboarding/Onboarding';
+import { ProfileScreen } from './features/profile/ProfileScreen';
 import { TodayScreen } from './features/today/TodayScreen';
 import { useTodayNumber } from './features/useProgram';
 
@@ -15,7 +16,7 @@ function Game({ profile }: { profile: Profile }) {
       <main className="mx-auto max-w-lg px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))]">
         <Switch>
           <Route path="/profil">
-            <h1 className="text-2xl">Profil</h1>
+            <ProfileScreen profile={profile} todayNumber={todayNumber} />
           </Route>
           <Route path="/ayarlar">
             <h1 className="text-2xl">Ayarlar</h1>
