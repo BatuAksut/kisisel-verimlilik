@@ -1,0 +1,9 @@
+name = "quest66-proxy"
+main = "worker.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Uygulamanı yayınladığın site kökeni. Yol içermez: https://kullanici.github.io gibi.
+ALLOWED_ORIGINS = "https://KULLANICI.github.io"
+# Virgülle birden fazla sağlayıcı eklenebilir. İlki varsayılandır.
+ALLOWED_UPSTREAMS = "https://api.deepseek.com"
