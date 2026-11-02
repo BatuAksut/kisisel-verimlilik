@@ -36,6 +36,9 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,png,woff2}'],
         navigateFallback: `${base}index.html`,
         importScripts: ['sw-notifications.js'],
+        // İlk ziyarette de sayfa hemen service worker'a bağlansın, yeni sürüm beklemeden devreye girsin.
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

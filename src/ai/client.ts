@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { AppSettings } from '../domain/types';
 
 export type AiErrorKind = 'config' | 'offline' | 'auth' | 'http' | 'network' | 'timeout' | 'aborted' | 'invalid';
@@ -107,6 +107,16 @@ function parseContent<T>(content: string, schema: z.ZodType<T>): T {
     throw new AiError('invalid', `Model yanıtı beklenen biçimde değil: ${issues}`);
   }
   return result.data;
+}
+
+/** Ayarlar ekranı için küçük bir deneme isteği atar; sorun varsa AiError fırlatır. */
+export async function testConnection(config: AiConfig, options: ChatOptions = {}): Promise<void> {
+  await chatJson(
+    config,
+    [{ role: 'user', content: 'Bu bir bağlantı testidir. Yalnızca şu JSON nesnesini döndür: {"ok": true}' }],
+    z.object({ ok: z.boolean() }),
+    { maxTokens: 30, timeoutMs: 30_000, ...options },
+  );
 }
 
 const RETRYABLE: AiErrorKind[] = ['invalid', 'http', 'network'];

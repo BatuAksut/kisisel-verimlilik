@@ -6,6 +6,7 @@ import { db } from './db/database';
 import type { Profile } from './domain/types';
 import { Onboarding } from './features/onboarding/Onboarding';
 import { ProfileScreen } from './features/profile/ProfileScreen';
+import { SettingsScreen } from './features/settings/SettingsScreen';
 import { TodayScreen } from './features/today/TodayScreen';
 import { useTodayNumber } from './features/useProgram';
 
@@ -19,7 +20,7 @@ function Game({ profile }: { profile: Profile }) {
             <ProfileScreen profile={profile} todayNumber={todayNumber} />
           </Route>
           <Route path="/ayarlar">
-            <h1 className="text-2xl">Ayarlar</h1>
+            <SettingsScreen profile={profile} />
           </Route>
           <Route>
             <TodayScreen profile={profile} todayNumber={todayNumber} />
