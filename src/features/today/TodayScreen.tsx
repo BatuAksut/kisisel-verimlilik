@@ -11,7 +11,7 @@ import type { Profile, Quest, WeekRecord } from '../../domain/types';
 import { bossOfWeek, daysUntilBoss, LOCATIONS, narratorLine, timeOfDay, type BossState } from '../../domain/world';
 import { remindPendingQuests } from '../../notifications/notifications';
 import { rerollSideQuest, toggleQuest } from '../../quests/actions';
-import { syncStatus, upgradePoolWeek } from '../../quests/sync';
+import { cancelAiUpgrade, syncStatus, upgradePoolWeek } from '../../quests/sync';
 import { useProgress } from '../useProgram';
 import { BossEncounter, BossTeaser } from './BossCard';
 import { Celebration, useCelebrations } from './Celebration';
@@ -23,14 +23,30 @@ import { QuestCard } from './QuestCard';
 import { ReflectionCard } from './ReflectionCard';
 
 function AiBanner() {
+  const percent = useSyncExternalStore(syncStatus.subscribe, syncStatus.percent);
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const update = () => setSeconds(Math.round((Date.now() - syncStatus.startedAt()) / 1000));
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, []);
   return (
-    <p role="status" className="flex items-start gap-2 bg-panel-high px-3 py-2 text-sm">
-      <PixelIcon name="star" size={16} className="mt-0.5 animate-pulse text-orchid" />
-      <span>
-        Yapay zekâ sana özel görevleri hazırlıyor, bu 1-2 dakika sürebilir. O zamana kadar bu görevlerle başlayabilirsin.
-        Birini işaretlersen bugün bunlarla devam edersin, yenileri yarından gelir.
-      </span>
-    </p>
+    <div role="status" className="space-y-2 bg-panel-high px-3 py-2 text-sm">
+      <p className="flex items-start gap-2">
+        <PixelIcon name="star" size={16} className="mt-0.5 animate-pulse text-orchid" />
+        <span>
+          Yapay zekâ sana özel görevleri hazırlıyor: %{percent} ({seconds} sn). Genelde yarım dakika sürer, bu ekranda kal.
+          O zamana kadar bu görevlerle başlayabilirsin; birini işaretlersen bugün bunlarla devam edersin, yenileri yarından gelir.
+        </span>
+      </p>
+      <div className="h-1.5 bg-ink-soft">
+        <div className="h-full bg-orchid transition-[width]" style={{ width: `${percent}%` }} />
+      </div>
+      <button type="button" className="min-h-9 font-pixel text-sm text-ice" onClick={cancelAiUpgrade}>
+        Vazgeç
+      </button>
+    </div>
   );
 }
 

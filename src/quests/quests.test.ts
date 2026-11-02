@@ -250,10 +250,15 @@ describe('yapay zekâ görev şeması', () => {
     expect(normalizeTask({ ...rawTask(), why: null, habit: null }, 'main', 'x')).toMatchObject({ why: undefined, habit: undefined });
   });
 
-  it('özellik puanı vermeyen görevi reddeder', () => {
+  it('özellik puanı geçersiz görevi reddetmez, puanı görevin alanına yazar', () => {
+    // Gerçek modelde 5 üretimin 2sinde görüldü: yan görevde listede olmayan özellik adları.
     const plan = structuredClone(validPlan);
-    plan.boss.stats = {};
-    expect(weekPlanSchema([1, 2]).safeParse(plan).success).toBe(false);
+    plan.boss.stats = { yaraticilik: 20 } as never;
+    const parsed = weekPlanSchema([1, 2]).safeParse(plan);
+    expect(parsed.success).toBe(true);
+    const task = { ...rawTask(), area: 'hareket' as const, stats: {}, xp: 20 };
+    expect(normalizeTask(task, 'main', 'x')).toMatchObject({ stats: { guc: 20 }, xp: 20 });
+    expect(normalizeTask({ ...task, xp: 500 }, 'main', 'x')).toMatchObject({ stats: { guc: 30 }, xp: 30 });
   });
 });
 

@@ -35,6 +35,77 @@ describe('adres ayarı', () => {
   });
 });
 
+const encoder = new TextEncoder();
+const streamed = (body: ReadableStream<Uint8Array>) => new Response(body, { headers: { 'Content-Type': 'text/event-stream' } });
+const sseLine = (delta: object, finish: string | null = null) =>
+  `data: ${JSON.stringify({ choices: [{ delta, finish_reason: finish }] })}\n\n`;
+function chunks(...parts: string[]) {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      parts.forEach((part) => controller.enqueue(encoder.encode(part)));
+      controller.close();
+    },
+  });
+}
+
+describe('akışlı yanıt', () => {
+  it('parçaları birleştirir, satır ortasından bölünse de ilerleme bildirir', async () => {
+    const whole = `: keep-alive\n\n${sseLine({ reasoning_content: 'düşünce' })}${sseLine({ content: '{"ok":' })}${sseLine({ content: 'true}' }, 'stop')}data: [DONE]\n\n`;
+    const fetchImpl = fakeFetch(streamed(chunks(whole.slice(0, 40), whole.slice(40))));
+    const progress: number[] = [];
+    await expect(chatJson(config, messages, schema, { fetchImpl, onProgress: (chars) => progress.push(chars) })).resolves.toEqual({ ok: true });
+    expect(progress).toEqual([6, 11]);
+    expect(bodyOf(fetchImpl, 0).stream).toBe(true);
+  });
+
+  it('token sınırına takılan akışı geçersiz sayıp yeniden dener', async () => {
+    const fetchImpl = fakeFetch(streamed(chunks(sseLine({ content: '{"ok":' }, 'length'))), reply('{"ok":true}'));
+    await expect(chatJson(config, messages, schema, { fetchImpl })).resolves.toEqual({ ok: true });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('veri akışı durursa takılı kalmaz: bir kez yeniden dener, sonra hata verir', async () => {
+    vi.useFakeTimers();
+    try {
+      const silent = () =>
+        vi.fn(async (_url: unknown, init?: RequestInit) => {
+          const body = new ReadableStream<Uint8Array>({
+            start(controller) {
+              init?.signal?.addEventListener('abort', () => controller.error(new Error('kesildi')));
+            },
+          });
+          return streamed(body);
+        });
+      const fetchImpl = silent();
+      const result = errorOf(chatJson(config, messages, schema, { fetchImpl: fetchImpl as unknown as typeof fetch }));
+      await vi.advanceTimersByTimeAsync(121_000);
+      expect(await result).toMatchObject({ kind: 'timeout' });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('iptal edilince yeniden denemez', async () => {
+    const cancel = new AbortController();
+    const fetchImpl = vi.fn(async () => {
+      cancel.abort();
+      throw new DOMException('Aborted', 'AbortError');
+    });
+    const error = await errorOf(chatJson(config, messages, schema, { fetchImpl: fetchImpl as unknown as typeof fetch, signal: cancel.signal }));
+    expect(error).toMatchObject({ kind: 'aborted' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('düşünme modunu yalnızca DeepSeek için kapatır', async () => {
+    const fetchImpl = fakeFetch(reply('{"ok":true}'), reply('{"ok":true}'));
+    await chatJson(config, messages, schema, { fetchImpl });
+    await chatJson({ ...config, baseUrl: 'https://baska.example/v1' }, messages, schema, { fetchImpl });
+    expect(bodyOf(fetchImpl, 0).thinking).toEqual({ type: 'disabled' });
+    expect(bodyOf(fetchImpl, 1).thinking).toBeUndefined();
+  });
+});
+
 describe('chatJson', () => {
   it('JSON modunda ister ve doğrulanmış sonucu döndürür', async () => {
     const fetchImpl = fakeFetch(reply('{"ok":true}'));

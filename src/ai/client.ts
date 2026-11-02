@@ -21,14 +21,20 @@ export interface ChatOptions {
   timeoutMs?: number;
   maxTokens?: number;
   fetchImpl?: typeof fetch;
+  /** Akış sırasında, o ana kadar gelen yanıtın karakter sayısıyla çağrılır. */
+  onProgress?: (chars: number) => void;
 }
 
-const DEFAULT_TIMEOUT_MS = 240_000;
+const DEFAULT_TIMEOUT_MS = 150_000;
+// Yanıt akarken bu kadar süre hiç veri gelmezse bağlantı kopmuş sayılır (örneğin ekran kilitlenince).
+const IDLE_TIMEOUT_MS = 60_000;
 // Düşünme modundaki modeller bütçenin büyük kısmını muhakemeye harcar. Bu kadar yüksek bir sınırı
 // kabul etmeyen sağlayıcılar için istek bir kez düşük sınırla tekrarlanır.
 const DEFAULT_MAX_TOKENS = 24_000;
 const FALLBACK_MAX_TOKENS = 8_000;
 const trimSlash = (url: string) => url.trim().replace(/\/+$/, '');
+// Gerçek ölçüm (Kasım 2026, bir hafta): düşünme açıkken 83 sn, kapalıyken 25 sn.
+const thinkingOff = (config: AiConfig) => (/deepseek\.com/i.test(config.baseUrl) ? { thinking: { type: 'disabled' } } : {});
 
 export function isAiConfigured(config: AiConfig): boolean {
   return config.apiKey.trim() !== '' && config.baseUrl.trim() !== '' && config.model.trim() !== '';
@@ -47,6 +53,47 @@ function upstreamMessage(bodyText: string): string {
   }
 }
 
+interface Completion {
+  content: unknown;
+  finishReason: unknown;
+}
+
+/** Sunucunun `text/event-stream` yanıtını okur; her veri geldiğinde `onData` çağrılır. */
+async function readStream(body: ReadableStream<Uint8Array>, onData: () => void, onProgress?: (chars: number) => void): Promise<Completion> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
+  let finishReason: unknown;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onData();
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.startsWith('data:')) continue;
+      const data = line.slice(5).trim();
+      if (data === '' || data === '[DONE]') continue;
+      let chunk;
+      try {
+        chunk = JSON.parse(data);
+      } catch {
+        throw new AiError('invalid', 'Sunucu akışı bozuk geldi.');
+      }
+      if (chunk?.error) throw new AiError('http', `Sunucu yanıtı yarıda kesti. ${upstreamMessage(data)}`.trim());
+      const choice = chunk?.choices?.[0];
+      if (typeof choice?.delta?.content === 'string') {
+        content += choice.delta.content;
+        onProgress?.(content.length);
+      }
+      finishReason = choice?.finish_reason ?? finishReason;
+    }
+  }
+  return { content, finishReason };
+}
+
 async function requestOnce(config: AiConfig, messages: ChatMessage[], options: ChatOptions): Promise<string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -56,10 +103,18 @@ async function requestOnce(config: AiConfig, messages: ChatMessage[], options: C
   if (config.proxyUrl.trim()) headers['X-Upstream-Base'] = trimSlash(config.baseUrl);
 
   const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-  const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+  const idle = new AbortController();
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  const onData = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => idle.abort(), IDLE_TIMEOUT_MS);
+  };
+  onData();
+  const signal = AbortSignal.any([timeout, idle.signal, ...(options.signal ? [options.signal] : [])]);
 
   let response: Response;
-  let bodyText: string;
+  let bodyText = '';
+  let completion: Completion | undefined;
   try {
     response = await (options.fetchImpl ?? fetch)(chatUrl(config), {
       method: 'POST',
@@ -71,17 +126,26 @@ async function requestOnce(config: AiConfig, messages: ChatMessage[], options: C
         response_format: { type: 'json_object' },
         max_tokens: options.maxTokens ?? DEFAULT_MAX_TOKENS,
         temperature: 0.8,
-        stream: false,
+        stream: true,
+        ...thinkingOff(config),
       }),
     });
-    bodyText = await response.text();
+    onData();
+    // Akışı desteklemeyen sağlayıcı veya proxy düz JSON döndürebilir; ikisi de kabul edilir.
+    const isStream = response.ok && response.body && response.headers.get('Content-Type')?.includes('text/event-stream');
+    if (isStream) completion = await readStream(response.body!, onData, options.onProgress);
+    else bodyText = await response.text();
   } catch (error) {
+    if (error instanceof AiError) throw error;
     if (options.signal?.aborted) throw new AiError('aborted', 'İstek iptal edildi.');
     if (timeout.aborted) throw new AiError('timeout', 'Sunucu zamanında yanıt vermedi.');
+    if (idle.signal.aborted) throw new AiError('timeout', 'Sunucudan veri gelmeyi kesti. Bağlantı kopmuş olabilir.');
     throw new AiError(
       'network',
       `Sunucuya ulaşılamadı. İnternetini kontrol et; sorun sürerse CORS engeli olabilir, Proxy URL dene. (${String(error)})`,
     );
+  } finally {
+    clearTimeout(idleTimer);
   }
 
   if (response.status === 401 || response.status === 403) {
@@ -96,15 +160,15 @@ async function requestOnce(config: AiConfig, messages: ChatMessage[], options: C
   }
   if (!response.ok) throw new AiError('http', `Sunucu hata döndürdü (HTTP ${response.status}).`);
 
-  let content: unknown;
-  let finishReason: unknown;
-  try {
-    const choice = JSON.parse(bodyText)?.choices?.[0];
-    content = choice?.message?.content;
-    finishReason = choice?.finish_reason;
-  } catch {
-    throw new AiError('invalid', 'Sunucu yanıtı JSON değil.');
+  if (!completion) {
+    try {
+      const choice = JSON.parse(bodyText)?.choices?.[0];
+      completion = { content: choice?.message?.content, finishReason: choice?.finish_reason };
+    } catch {
+      throw new AiError('invalid', 'Sunucu yanıtı JSON değil.');
+    }
   }
+  const { content, finishReason } = completion;
   if (finishReason === 'length') throw new AiError('invalid', 'Model yanıtı token sınırına takılıp yarıda kesildi.');
   if (typeof content !== 'string' || content.trim() === '') {
     throw new AiError('invalid', 'Model boş yanıt döndürdü.');
@@ -142,7 +206,7 @@ export async function testConnection(config: AiConfig, options: ChatOptions = {}
   );
 }
 
-const RETRYABLE: AiErrorKind[] = ['invalid', 'http', 'network'];
+const RETRYABLE: AiErrorKind[] = ['invalid', 'http', 'network', 'timeout'];
 
 /** İsteği gönderir, JSON'u şemayla doğrular. Hatalı yanıtta bir kez, hatayı da bildirerek yeniden dener. */
 export async function chatJson<T>(

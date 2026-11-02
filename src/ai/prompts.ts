@@ -15,7 +15,8 @@ GÖREV KURALLARI
 
 ANA GÖREVLERİN KALİTESİ (en önemli bölüm)
 - Her ana görev, etkisi araştırmayla desteklenen gerçek bir davranış olmalı. Kişi yaptığında hayatında bir şey değişmeli.
-- Asla ana görev verme: tek seferlik ayar ya da hazırlık işi (bildirim kapatmak, alarm kurmak, uygulama indirmek, masaya su şişesi koymak, "3 önceliğini yaz" gibi), kanıtı zayıf kural ("günde 8 bardak su", "sabah 5'te kalk", detoks, sabah limonlu su), süslü ama boş görev. Bunlar en fazla yan görev olabilir.
+- Asla ana görev verme: tek seferlik ayar ya da hazırlık işi (bildirim kapatmak, alarm kurmak, uygulama indirmek, masaya su şişesi koymak, "3 önceliğini yaz" gibi), kanıtı zayıf kural ("günde 8 bardak su", "sabah 5'te kalk", detoks, sabah suyu, sabah limonlu su), süslü ama boş görev. Bunlar en fazla yan görev olabilir.
+- Çekirdek alışkanlıkları kişinin odakAlanlari içinden seç. Başlıklar genel kategori adı değil, davranışın kendisi olsun: "Kısa Yürüyüş" değil, "Akşam yemeğinden sonra 10 dakika yürü".
 - Görev kısa olabilir ama basit olamaz: zaman azsa aynı davranışın küçük ve gerçek bir biçimini ver (ör. 10 dakika yemek sonrası yürüyüş).
 - Her günde tam olarak ÇEKİRDEK ALIŞKANLIK kadar görevde "habit": true olsun. Bu görevler haftanın her günü aynı başlıkla ve aynı bağlamda tekrar etsin, çünkü alışkanlık aynı davranışın aynı ortamda tekrarıyla otomatikleşir. Önceki hafta sürdürülebildiyse aynı alışkanlığı biraz zorlaştırarak devam ettir. Diğer ana görevler günden güne değişebilir.
 - Her ana görevin ve Boss'un "why" alanında, tek cümlede ve en fazla 160 karakterle, neden işe yaradığını ve kanıtın ne kadar güçlü olduğunu dürüstçe yaz. Etki küçükse ya da kanıt gözlemselse bunu söyle.
@@ -37,7 +38,7 @@ GÜVENLİK
 - Tehlikeli fiziksel görev verme: aşırı antrenman, uykusuz kalma, soğuğa veya sıcağa maruz kalma, başkalarını ya da kendini riske atan hiçbir şey.
 
 ALANLAR (area): uyku, su, hareket, zihin, ekran, beslenme, sosyal, ogrenme
-ÖZELLİKLER (stats anahtarları): guc, zihin, disiplin, saglik, sosyal
+ÖZELLİKLER (stats anahtarları, başka anahtar kullanma, yan görevlerde de): guc, zihin, disiplin, saglik, sosyal
 
 XP KURALLARI: xp, stats içindeki değerlerin toplamına eşit olmalı. Ana görev toplam 10-30, yan görev 15-40, Boss 60-150 XP.
 
@@ -88,7 +89,7 @@ export function buildWeekPrompt(input: WeekPromptInput): string {
 - "days" dizisinde tam olarak şu günler olsun: ${input.days.join(', ')}.
 - Her günde tam ${MAIN_COUNT[input.difficulty]} ana görev ve ${SIDE_COUNT[input.difficulty]} yan görev olsun.
 - ÇEKİRDEK ALIŞKANLIK sayısı: ${HABIT_COUNT[input.difficulty]}. Her gün aynı ${HABIT_COUNT[input.difficulty]} görev tekrar etsin ve "habit": true taşısın.
-- Boss hariç, her günün görevlerinin toplam süresi en fazla ${input.answers.freeMinutes} dakika olsun.
+- Boss hariç, her günün görevlerinin toplam süresi en fazla ${input.answers.freeMinutes} dakika olsun. Bu sınırı aşmamak için görev başına ortalama ${Math.floor(input.answers.freeMinutes / (MAIN_COUNT[input.difficulty] + SIDE_COUNT[input.difficulty]))} dakikayı hedefle; bir gün uzun görev varsa diğerlerini kısa tut.
 - Bir Boss görevi üret ("boss" alanı, ${bossDayOfWeek(input.weekNumber)}. günde çıkacak).
 - Kişi yan görevini değiştirmek isterse diye "spareSide" alanında ${SPARE_SIDE_COUNT} yedek yan görev üret.
 

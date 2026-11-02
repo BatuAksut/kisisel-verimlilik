@@ -1,16 +1,26 @@
 import { z } from 'zod';
-import { AREAS, STAT_KEYS, type QuestBlueprint, type QuestType, type Stats } from '../domain/types';
+import { AREAS, STAT_KEYS, type Area, type QuestBlueprint, type QuestType, type StatKey, type Stats } from '../domain/types';
 import type { PlannedWeek } from '../quests/plan';
 
-const statsSchema = z
-  .object({
-    guc: z.number().min(0).optional(),
-    zihin: z.number().min(0).optional(),
-    disiplin: z.number().min(0).optional(),
-    saglik: z.number().min(0).optional(),
-    sosyal: z.number().min(0).optional(),
-  })
-  .refine((stats) => Object.values(stats).some((value) => (value ?? 0) > 0), 'En az bir özellik XP vermeli');
+// Model bazen listede olmayan bir özellik adı yazıyor; bu yüzden bütün hafta reddedilmesin (bkz. normalizeTask).
+const statsSchema = z.object({
+  guc: z.number().min(0).optional(),
+  zihin: z.number().min(0).optional(),
+  disiplin: z.number().min(0).optional(),
+  saglik: z.number().min(0).optional(),
+  sosyal: z.number().min(0).optional(),
+});
+
+const AREA_STAT: Record<Area, StatKey> = {
+  uyku: 'saglik',
+  su: 'saglik',
+  hareket: 'guc',
+  zihin: 'zihin',
+  ekran: 'disiplin',
+  beslenme: 'saglik',
+  sosyal: 'sosyal',
+  ogrenme: 'zihin',
+};
 
 export const taskSchema = z.object({
   id: z.union([z.string(), z.number()]).transform(String),
@@ -63,16 +73,17 @@ const clamp = (value: number, [min, max]: [number, number]) => Math.min(Math.max
 
 /**
  * Modelin sayılarına tek başına güvenilmez: xp her zaman özellik puanlarının toplamına eşitlenir,
- * bu toplam da görev türünün aralığına çekilir.
+ * bu toplam da görev türünün aralığına çekilir. Geçerli özellik yoksa puan görevin alanına yazılır.
  */
 export function normalizeTask(task: RawTask, type: QuestType, id: string): QuestBlueprint {
   const raw = STAT_KEYS.reduce((sum, key) => sum + (task.stats[key] ?? 0), 0);
-  const target = clamp(raw, XP_RANGE[type]);
-  const scale = target / raw;
+  const source: Stats = raw > 0 ? task.stats : { [AREA_STAT[task.area]]: task.xp };
+  const total = raw > 0 ? raw : task.xp;
+  const scale = clamp(total, XP_RANGE[type]) / total;
   const stats: Stats = {};
   let xp = 0;
   for (const key of STAT_KEYS) {
-    const value = Math.round((task.stats[key] ?? 0) * scale);
+    const value = Math.round((source[key] ?? 0) * scale);
     if (value > 0) {
       stats[key] = value;
       xp += value;

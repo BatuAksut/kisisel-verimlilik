@@ -116,6 +116,46 @@ test('yapay zekâ yanıt vermezken görevler hemen kullanılabilir, başlanınca
   await expect(page.getByText('AI görevi m2-1')).toBeVisible();
 });
 
+test('yapay zekâ isteğinden Vazgeç ile çıkılır, görevler havuzdan kalır', async ({ page }) => {
+  await page.route(API_PATTERN, () => new Promise(() => undefined));
+  await completeOnboarding(page, { apiKey: 'test-anahtari' });
+  await page.getByRole('button', { name: 'Vazgeç' }).click();
+  await expect(page.getByText('Yapay zekâ sana özel görevleri hazırlıyor')).toBeHidden();
+  await expect(page.getByText('İstek iptal edildi')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Yeniden dene' })).toBeVisible();
+  await expect(questButtons(page, 'Ana görevler')).toHaveCount(4);
+});
+
+test('uygulamadan çıkılırken kopan istek hata göstermez, dönünce yeniden denenir', async ({ page }) => {
+  let healthy = false;
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(API_PATTERN, async (route) => {
+    await held;
+    if (healthy) await route.fulfill(chatReply(JSON.stringify(aiWeek([1, 2, 3, 4, 5, 6, 7]))));
+    else await route.abort();
+  });
+  const setHidden = (hidden: boolean) =>
+    page.evaluate((value) => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => value });
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (value ? 'hidden' : 'visible') });
+      document.dispatchEvent(new Event('visibilitychange'));
+    }, hidden);
+
+  await completeOnboarding(page, { apiKey: 'test-anahtari' });
+  await expect(page.getByText('Yapay zekâ sana özel görevleri hazırlıyor')).toBeVisible();
+  await setHidden(true);
+  release();
+  await expect(page.getByText('Yapay zekâ sana özel görevleri hazırlıyor')).toBeHidden();
+  await expect(page.getByText('Yapay zekâya ulaşılamadı')).toHaveCount(0);
+
+  healthy = true;
+  await setHidden(false);
+  await expect(page.getByText('AI görevi m1-1')).toBeVisible();
+});
+
 test('yapay zekâ hatasında Yeniden dene çalışır', async ({ page }) => {
   let healthy = false;
   await page.route(API_PATTERN, (route) =>

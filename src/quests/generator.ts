@@ -1,4 +1,4 @@
-import { chatJson } from '../ai/client';
+import { chatJson, type ChatOptions } from '../ai/client';
 import { buildWeekPrompt, SYSTEM_PROMPT } from '../ai/prompts';
 import { isSafeQuest } from '../ai/safety';
 import { normalizePlan, weekPlanSchema } from '../ai/schemas';
@@ -77,7 +77,7 @@ export async function buildWeek(
   weekNumber: number,
   days: number[],
   useAi: boolean,
-  signal?: AbortSignal,
+  ai: Pick<ChatOptions, 'signal' | 'onProgress'> = {},
 ): Promise<WeekBuildResult> {
   const summary = await previousWeekSummary(weekNumber);
   const input = await buildPlanInput(profile, weekNumber, days, summary);
@@ -103,7 +103,7 @@ export async function buildWeek(
         },
       ],
       weekPlanSchema(days),
-      { signal },
+      ai,
     );
     const plan = normalizePlan(raw, weekNumber, Date.now().toString(36));
     return { plan: applySafety(plan, poolPlan), source: 'ai' };

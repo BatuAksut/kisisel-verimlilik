@@ -23,11 +23,27 @@ function describeError(error: unknown): string | undefined {
 
 // Arayüzdeki "yapay zekâ çalışıyor" şeridi için küçük bir durum aboneliği.
 let generating = false;
+let startedAt = 0;
+let percent = 0;
+let cancelRun: AbortController | null = null;
 const listeners = new Set<() => void>();
+const notify = () => listeners.forEach((listener) => listener());
 
 function setGenerating(value: boolean) {
   generating = value;
-  listeners.forEach((listener) => listener());
+  startedAt = value ? Date.now() : 0;
+  percent = 0;
+  notify();
+}
+
+// Gerçek ölçüm: yapay zekâ yanıtı gün başına yaklaşık 2.800 karakter tutuyor.
+const CHARS_PER_DAY = 2_800;
+
+function setPercent(chars: number, dayCount: number) {
+  const next = Math.min(99, Math.round((chars / (dayCount * CHARS_PER_DAY)) * 100));
+  if (next === percent) return;
+  percent = next;
+  notify();
 }
 
 export const syncStatus = {
@@ -38,7 +54,24 @@ export const syncStatus = {
     };
   },
   isGenerating: () => generating,
+  percent: () => percent,
+  startedAt: () => startedAt,
 };
+
+/** Süren yapay zekâ isteğini durdurur; hazır havuz görevleri yerinde kalır. */
+export function cancelAiUpgrade(): void {
+  cancelRun?.abort();
+}
+
+/** İstek sürerken ekran kilitlenirse bağlantı kopabilir; destekleyen tarayıcıda ekran açık tutulur. */
+async function keepScreenOn(): Promise<() => void> {
+  try {
+    const lock = await globalThis.navigator?.wakeLock?.request('screen');
+    return () => void lock?.release().catch(() => {});
+  } catch {
+    return () => {};
+  }
+}
 
 /** Geçmiş günleri kapatır: eksik gün kayıtları açılır, bekleyen görevler "kaçırıldı" olur. */
 export async function closePastDays(profile: Profile, todayNumber: number): Promise<void> {
@@ -79,15 +112,31 @@ async function runAiUpgrade(now: Date, force: boolean): Promise<boolean> {
   const days = daysOfWeek(weekNumber).filter((day) => day >= firstDay);
   if (days.length === 0) return false;
 
+  const cancel = new AbortController();
+  cancelRun = cancel;
+  // Uygulamadan çıkılan sırada kopan istek gerçek bir hata sayılmaz: dönüşte hemen yeniden denenir.
+  let leftApp = false;
+  const onVisibility = () => {
+    if (document.hidden) leftApp = true;
+  };
+  globalThis.document?.addEventListener('visibilitychange', onVisibility);
+  const releaseScreen = await keepScreenOn();
   setGenerating(true);
   try {
-    const result = await buildWeek(profile, settings, weekNumber, days, true);
+    const result = await buildWeek(profile, settings, weekNumber, days, true, {
+      signal: cancel.signal,
+      onProgress: (chars) => setPercent(chars, days.length),
+    });
     // İstek sürerken kullanıcı bugünün görevlerine başlamış olabilir.
     const fromDay = (await isTodayUntouched(todayNumber)) ? firstDay : Math.max(firstDay, todayNumber + 1);
     const plannedDays = result.plan.days.filter((day) => day.day >= fromDay);
     if (result.source === 'ai' && plannedDays.length > 0) {
       await saveWeekPlan(weekNumber, { ...result.plan, days: plannedDays }, 'ai', fromDay, { attemptedAt: now.getTime() });
       return true;
+    }
+    if (leftApp && !cancel.signal.aborted) {
+      retryWhenBack = true;
+      return false;
     }
     await db.weeks.update(weekNumber, { lastAiAttemptAt: now.getTime(), lastError: describeError(result.error) });
     return false;
@@ -96,17 +145,25 @@ async function runAiUpgrade(now: Date, force: boolean): Promise<boolean> {
     await db.weeks.update(weekNumber, { lastAiAttemptAt: now.getTime(), lastError: describeError(error) });
     return false;
   } finally {
+    globalThis.document?.removeEventListener('visibilitychange', onVisibility);
+    releaseScreen();
+    cancelRun = null;
     setGenerating(false);
   }
 }
 
 let aiRun: Promise<boolean> | null = null;
+let retryWhenBack = false;
 
 export function upgradePoolWeek(now: Date = new Date(), force = false): Promise<boolean> {
   // Ayarlar'dan yeni anahtar geldiyse, süren istek eski anahtarla olabilir: bitince yeniden denenir.
   if (aiRun) return force ? aiRun.then(() => upgradePoolWeek(now, true)) : aiRun;
   aiRun = runAiUpgrade(now, force).finally(() => {
     aiRun = null;
+    const retry = retryWhenBack && !globalThis.document?.hidden;
+    retryWhenBack = false;
+    // Hâlâ arka plandaysa yeniden deneme, uygulama görünür olunca syncProgram'dan gelir.
+    if (retry) void upgradePoolWeek(new Date()).catch(console.error);
   });
   return aiRun;
 }
