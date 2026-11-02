@@ -127,7 +127,7 @@ export function ProfileScreen({ profile, todayNumber }: { profile: Profile; toda
         <StatTile icon="flame" label="Güncel seri" value={progress.streak} tone="text-amber" />
         <StatTile icon="star" label="En iyi seri" value={progress.bestStreak} tone="text-orchid" />
         <StatTile icon="snow" label="Dondurucu" value={progress.freezes} tone="text-ice" />
-        <StatTile icon="map" label="Kalan gün" value={daysLeft} tone="text-moss" />
+        <StatTile icon="flag" label="Kalan gün" value={daysLeft} tone="text-moss" />
       </div>
 
       {progress.penaltyTotal > 0 && (

@@ -104,6 +104,34 @@ test('Boss görevi haftanın son gününde çıkar', async ({ page }) => {
   await expect(questButtons(page, 'Boss görevi')).toHaveCount(1);
 });
 
+test('bildirim izni kartla istenir, reddedilince bir daha sorulmaz', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Notification, 'permission', { get: () => 'default' });
+  });
+  await completeOnboarding(page);
+  const prompt = page.getByText('Uygulamayı açtığında bekleyen görevlerini hatırlatayım mı?');
+  await expect(prompt).toBeVisible();
+  await page.getByRole('button', { name: 'Şimdi değil' }).click();
+  await expect(prompt).toBeHidden();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<boolean>((resolve) => {
+            const open = indexedDB.open('quest66');
+            open.onsuccess = () => {
+              const get = open.result.transaction('settings').objectStore('settings').get('app');
+              get.onsuccess = () => resolve(Boolean(get.result?.notificationPromptDismissed));
+            };
+          }),
+      ),
+    )
+    .toBe(true);
+  await page.reload();
+  await expect(questButtons(page, 'Ana görevler')).toHaveCount(4);
+  await expect(prompt).toBeHidden();
+});
+
 test('ekranda yatay taşma olmaz', async ({ page }) => {
   await completeOnboarding(page, { difficulty: 'Hard Mode' });
   await expect(questButtons(page, 'Ana görevler')).toHaveCount(5);

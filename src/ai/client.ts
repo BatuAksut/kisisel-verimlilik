@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { AppSettings } from '../domain/types';
 
-export type AiErrorKind = 'config' | 'offline' | 'auth' | 'http' | 'network' | 'timeout' | 'aborted' | 'invalid';
+export type AiErrorKind = 'config' | 'auth' | 'request' | 'http' | 'network' | 'timeout' | 'aborted' | 'invalid';
 
 export class AiError extends Error {
   constructor(
@@ -32,6 +32,15 @@ export function isAiConfigured(config: AiConfig): boolean {
 
 export function chatUrl(config: AiConfig): string {
   return `${trimSlash(config.proxyUrl || config.baseUrl)}/chat/completions`;
+}
+
+function upstreamMessage(bodyText: string): string {
+  try {
+    const message = JSON.parse(bodyText)?.error?.message;
+    return typeof message === 'string' ? message.slice(0, 200) : '';
+  } catch {
+    return '';
+  }
 }
 
 async function requestOnce(config: AiConfig, messages: ChatMessage[], options: ChatOptions): Promise<string> {
@@ -75,6 +84,12 @@ async function requestOnce(config: AiConfig, messages: ChatMessage[], options: C
     throw new AiError('auth', `API anahtarı reddedildi (HTTP ${response.status}).`);
   }
   if (response.status === 402) throw new AiError('auth', 'Sağlayıcı hesabında yeterli bakiye yok (HTTP 402).');
+  if ([400, 404, 422].includes(response.status)) {
+    throw new AiError(
+      'request',
+      `Sağlayıcı isteği reddetti (HTTP ${response.status}). Model adı veya Base URL güncel olmayabilir, Ayarlar'dan kontrol et. ${upstreamMessage(bodyText)}`.trim(),
+    );
+  }
   if (!response.ok) throw new AiError('http', `Sunucu hata döndürdü (HTTP ${response.status}).`);
 
   let content: unknown;
@@ -115,7 +130,7 @@ export async function testConnection(config: AiConfig, options: ChatOptions = {}
     config,
     [{ role: 'user', content: 'Bu bir bağlantı testidir. Yalnızca şu JSON nesnesini döndür: {"ok": true}' }],
     z.object({ ok: z.boolean() }),
-    { maxTokens: 30, timeoutMs: 30_000, ...options },
+    { maxTokens: 500, timeoutMs: 30_000, ...options },
   );
 }
 

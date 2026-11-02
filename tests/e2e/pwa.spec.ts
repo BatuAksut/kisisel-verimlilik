@@ -31,6 +31,31 @@ test('internet kesilse de uygulama açılır ve görevler çalışır', async ({
   await expect(mains.nth(0)).toHaveAttribute('aria-pressed', 'true');
 });
 
+test('izin verilmişse açılışta bekleyen görevleri bildirimle hatırlatır, sık tekrarlamaz', async ({ page }) => {
+  // Başsız Chromium izni her zaman "denied" bildirir ve bildirim gösteremez. Bu yüzden izin taklit edilir,
+  // uygulamanın service worker'dan bildirim istediği kaydedilerek doğrulanır.
+  await page.addInitScript(() => {
+    Object.defineProperty(Notification, 'permission', { get: () => 'granted' });
+    ServiceWorkerRegistration.prototype.showNotification = async function (_title, options) {
+      const shown = JSON.parse(localStorage.getItem('shown') ?? '[]');
+      localStorage.setItem('shown', JSON.stringify([...shown, options?.body]));
+    };
+  });
+  const shown = () => page.evaluate(() => JSON.parse(localStorage.getItem('shown') ?? '[]') as string[]);
+
+  await completeOnboarding(page);
+  await expect(questButtons(page, 'Ana görevler')).toHaveCount(4);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect(questButtons(page, 'Ana görevler')).toHaveCount(4);
+  await expect.poll(shown).toEqual([expect.stringMatching(/^Bugün \d+ görev seni bekliyor\.$/)]);
+
+  await page.reload();
+  await expect(questButtons(page, 'Ana görevler')).toHaveCount(4);
+  await page.waitForTimeout(300);
+  expect(await shown()).toHaveLength(1);
+});
+
 test('çevrimdışı ilk haftada anahtar olsa bile görevler havuzdan gelir', async ({ page, context }) => {
   await page.goto('/');
   await page.evaluate(() => navigator.serviceWorker.ready);

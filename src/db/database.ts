@@ -35,5 +35,7 @@ export async function getSettings(): Promise<AppSettings> {
 }
 
 export async function saveSettings(changes: Partial<Omit<AppSettings, 'id'>>): Promise<void> {
-  await db.settings.put({ ...(await getSettings()), ...changes });
+  await db.transaction('rw', db.settings, async () => {
+    await db.settings.put({ ...(await getSettings()), ...changes });
+  });
 }

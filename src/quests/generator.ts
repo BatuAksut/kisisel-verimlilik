@@ -27,7 +27,7 @@ export async function previousWeekSummary(weekNumber: number): Promise<WeekSumma
     db.quests.where('weekNumber').equals(week).toArray(),
     db.reflections.where('dayNumber').between(days[0], days[days.length - 1], true, true).toArray(),
   ]);
-  return summarizeWeek(week, quests, reflections);
+  return summarizeWeek(week, quests, reflections, days.length);
 }
 
 async function buildPlanInput(profile: Profile, weekNumber: number, days: number[], summary: WeekSummary | null): Promise<PlanInput> {

@@ -333,6 +333,14 @@ describe('haftalık özet', () => {
     expect(intensityFor(0.49)).toBe('azalt');
   });
 
+  it('açılmayan günleri de hesaba katar, tek günlük başarı zorluğu artırmaz', () => {
+    const summary = summarizeWeek(2, [quest(8, 'done')], [], 7);
+    expect(summary.mainCompletion).toBe(1);
+    expect(summary.daysWithoutQuests).toBe(6);
+    expect(summary.intensity).toBe('azalt');
+    expect(summarizeWeek(2, [quest(8, 'done')], [], 1).intensity).toBe('artir');
+  });
+
   it('hiç görev yoksa yoğunluğu azaltır', () => {
     const summary = summarizeWeek(2, [], []);
     expect(summary.intensity).toBe('azalt');

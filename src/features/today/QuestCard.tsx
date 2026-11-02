@@ -63,7 +63,7 @@ export function QuestCard({ quest, onToggle, onReroll, rerollUsed }: QuestCardPr
         <span
           key={quest.completedAt}
           aria-hidden="true"
-          className="animate-float-up pointer-events-none absolute right-3 top-2 font-pixel text-lg text-moss"
+          className="animate-float-up pointer-events-none absolute right-20 top-2 font-pixel text-lg text-moss"
         >
           +{quest.xp} XP
         </span>

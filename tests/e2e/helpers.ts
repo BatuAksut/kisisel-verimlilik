@@ -26,6 +26,7 @@ export async function completeOnboarding(page: Page, options: OnboardingOptions 
   await expect(page.getByRole('heading', { name: 'Macera hazır' })).toBeVisible();
   if (options.apiKey) await page.getByPlaceholder('sk-...').fill(options.apiKey);
   await page.getByRole('button', { name: options.startTomorrow ? 'Yarın başla' : 'Bugün başla' }).click();
+  await expect(page.getByRole('heading', { name: 'Macera hazır' })).toBeHidden();
 }
 
 export function questButtons(page: Page, section: 'Ana görevler' | 'Yan görevler' | 'Boss görevi') {

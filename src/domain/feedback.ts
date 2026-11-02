@@ -11,6 +11,7 @@ export interface WeekSummary {
   averageMood: number | null;
   notes: string[];
   missedTitles: string[];
+  daysWithoutQuests: number;
   intensity: Intensity;
 }
 
@@ -25,9 +26,18 @@ function completion(quests: Quest[]): number {
   return quests.filter((quest) => quest.status === 'done').length / quests.length;
 }
 
-/** Bir sonraki haftanın üretiminde modele bağlam olarak giden özet. */
-export function summarizeWeek(weekNumber: number, quests: Quest[], reflections: Reflection[]): WeekSummary {
+/**
+ * Bir sonraki haftanın üretiminde modele bağlam olarak giden özet. Uygulamanın hiç açılmadığı
+ * günlerde görev olmadığından, yoğunluk önerisi bu günleri de tamamlanmamış sayar.
+ */
+export function summarizeWeek(
+  weekNumber: number,
+  quests: Quest[],
+  reflections: Reflection[],
+  daysInWeek: number = new Set(quests.map((quest) => quest.dayNumber)).size,
+): WeekSummary {
   const mains = quests.filter((quest) => quest.type === 'main');
+  const daysWithQuests = new Set(quests.map((quest) => quest.dayNumber)).size;
   const byArea: WeekSummary['byArea'] = {};
   for (const quest of quests) {
     const entry = byArea[quest.area] ?? { done: 0, total: 0 };
@@ -48,6 +58,7 @@ export function summarizeWeek(weekNumber: number, quests: Quest[], reflections: 
         : Math.round((reflections.reduce((sum, item) => sum + item.mood, 0) / reflections.length) * 10) / 10,
     notes: reflections.map((item) => item.note.trim()).filter(Boolean),
     missedTitles: mains.filter((quest) => quest.status !== 'done').map((quest) => quest.title),
-    intensity: intensityFor(mainCompletion),
+    daysWithoutQuests: daysInWeek - daysWithQuests,
+    intensity: intensityFor(daysInWeek === 0 ? 0 : (mainCompletion * daysWithQuests) / daysInWeek),
   };
 }

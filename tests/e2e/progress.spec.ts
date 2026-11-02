@@ -22,6 +22,14 @@ test('görev bitince XP, özellik ve seri profilde görünür', async ({ page })
   await expect(dayCell(page, 1)).toHaveAttribute('data-outcome', 'success');
   await expect(dayCell(page, 2)).toHaveAttribute('data-outcome', 'upcoming');
   await expect(page.locator('[data-day]')).toHaveCount(66);
+
+  // Özellik çubuklarının rengi CSS değişkeninden gelir; değişken derlemede kaybolursa çubuk görünmez olur.
+  const colors = await page.evaluate(() =>
+    ['guc', 'zihin', 'disiplin', 'saglik', 'sosyal'].map((key) =>
+      getComputedStyle(document.documentElement).getPropertyValue(`--color-stat-${key}`).trim(),
+    ),
+  );
+  expect(colors.every((color) => color.startsWith('#'))).toBe(true);
 });
 
 test('kaçırılan gün seriyi sıfırlar ve ızgarada görünür', async ({ page }) => {

@@ -91,6 +91,17 @@ describe('chatJson', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('geçersiz model hatasında yeniden denemez, sağlayıcının mesajını gösterir', async () => {
+    const fetchImpl = fakeFetch(
+      new Response(JSON.stringify({ error: { message: 'Model Not Exist' } }), { status: 400 }),
+    );
+    const error = await errorOf(chatJson(config, messages, schema, { fetchImpl }));
+    expect(error?.kind).toBe('request');
+    expect(error?.message).toContain('Model adı');
+    expect(error?.message).toContain('Model Not Exist');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it('ağ hatasında ve 5xx te bir kez yeniden dener', async () => {
     const network = fakeFetch(new TypeError('Failed to fetch'), reply('{"ok":true}'));
     await expect(chatJson(config, messages, schema, { fetchImpl: network })).resolves.toEqual({ ok: true });

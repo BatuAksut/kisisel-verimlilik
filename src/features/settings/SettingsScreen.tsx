@@ -126,7 +126,7 @@ function ApiSection({ settings }: { settings: AppSettings }) {
       <Field label="Base URL">
         <input className="field pixel-frame" inputMode="url" spellCheck={false} value={form.baseUrl} onChange={set('baseUrl')} />
       </Field>
-      <Field label="Model">
+      <Field label="Model" hint="Test model hatası verirse sağlayıcının belgelerindeki güncel model adını yaz.">
         <input className="field pixel-frame" spellCheck={false} value={form.model} onChange={set('model')} />
       </Field>
       <Field label="Proxy URL (isteğe bağlı)" hint="Bağlantı testi CORS hatası verirse Cloudflare Worker adresini buraya yaz.">
@@ -188,7 +188,7 @@ function DifficultySection({ profile }: { profile: Profile }) {
   );
 }
 
-function DataSection() {
+function DataSection({ onRestored }: { onRestored: () => void }) {
   const [includeKey, setIncludeKey] = useState(false);
   const [keepApi, setKeepApi] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -225,6 +225,7 @@ function DataSection() {
     await restoreBackup(pendingImport);
     setPendingImport(null);
     setNotice({ tone: 'ok', text: 'Yedek geri yüklendi.' });
+    onRestored();
     void syncProgram().catch(console.error);
   }
 
@@ -297,13 +298,14 @@ function DataSection() {
 
 export function SettingsScreen({ profile }: { profile: Profile }) {
   const settings = useLiveQuery(getSettings);
+  const [formVersion, setFormVersion] = useState(0);
   return (
     <div className="space-y-4">
       <h1 className="text-3xl">Ayarlar</h1>
-      {/* Form, ilk okunan değerlerle bir kez kurulur; kayıttan sonra yazılanlar silinmesin diye yeniden başlatılmaz. */}
-      {settings && <ApiSection settings={settings} />}
+      {/* Form okunan değerlerle bir kez kurulur; yalnızca yedek geri yüklenince yeniden başlatılır. */}
+      {settings && <ApiSection key={formVersion} settings={settings} />}
       <DifficultySection profile={profile} />
-      <DataSection />
+      <DataSection onRestored={() => setFormVersion((version) => version + 1)} />
     </div>
   );
 }

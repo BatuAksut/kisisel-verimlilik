@@ -18,7 +18,7 @@ import { ReflectionCard } from './ReflectionCard';
 function GeneratingCard({ generating }: { generating: boolean }) {
   return (
     <section className="panel pixel-frame space-y-3 p-4 text-center">
-      <PixelIcon name="map" size={32} className="text-amber" />
+      <PixelIcon name="flag" size={32} className="text-amber" />
       <p className="font-pixel text-lg">Haftanın görevleri hazırlanıyor</p>
       {generating && (
         <>
@@ -125,7 +125,7 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
   if (todayNumber < 1) {
     return (
       <div className="space-y-4 pt-10 text-center">
-        <PixelIcon name="map" size={48} className="text-amber" />
+        <PixelIcon name="flag" size={48} className="text-amber" />
         <h1 className="text-3xl">Macera yarın başlıyor</h1>
         <p className="text-muted">İlk görevlerin {profile.startDate.split('-').reverse().join('.')} günü burada olacak. İyi dinlen.</p>
       </div>

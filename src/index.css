@@ -1,6 +1,24 @@
 @import 'tailwindcss';
 
-@theme {
+/* Jersey 15 küçük çizildiği için size-adjust ile büyütülür; Türkçe harfler latin-ext dosyasındadır. */
+@font-face {
+  font-family: 'Jersey 15';
+  font-display: swap;
+  size-adjust: 125%;
+  src: url('@fontsource/jersey-15/files/jersey-15-latin-ext-400-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1E00-1E9F;
+}
+
+@font-face {
+  font-family: 'Jersey 15';
+  font-display: swap;
+  size-adjust: 125%;
+  src: url('@fontsource/jersey-15/files/jersey-15-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+
+/* static: --color-stat-* yalnızca satır içi stillerde kullanılıyor, Tailwind bunları atmasın. */
+@theme static {
   --color-ink: #11181c;
   --color-ink-soft: #182228;
   --color-panel: #1e2a31;
@@ -21,7 +39,7 @@
   --color-stat-saglik: #6fcf7f;
   --color-stat-sosyal: #c58be0;
 
-  --font-pixel: 'Pixelify Sans', ui-monospace, monospace;
+  --font-pixel: 'Jersey 15', ui-monospace, monospace;
   --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   --animate-float-up: float-up 900ms ease-out forwards;
@@ -70,7 +88,8 @@
   h2,
   h3 {
     font-family: var(--font-pixel);
-    font-weight: 500;
+    font-weight: 400;
+    font-synthesis: none;
     letter-spacing: 0.01em;
   }
 
