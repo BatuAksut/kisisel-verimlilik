@@ -188,6 +188,27 @@ function DifficultySection({ profile }: { profile: Profile }) {
   );
 }
 
+function SoundSection({ settings }: { settings: AppSettings }) {
+  const [enabled, setEnabled] = useState(settings.soundEnabled !== false);
+  return (
+    <Section title="Ses">
+      <label className="flex min-h-11 items-center gap-3">
+        <input
+          type="checkbox"
+          className="size-5 accent-amber"
+          checked={enabled}
+          onChange={(event) => {
+            setEnabled(event.target.checked);
+            void saveSettings({ soundEnabled: event.target.checked });
+          }}
+        />
+        <span>Ses efektleri</span>
+      </label>
+      <p className="text-xs text-muted">Titreşim bu ayardan etkilenmez, telefonun sessiz modu sesleri de kapatır.</p>
+    </Section>
+  );
+}
+
 function DataSection({ onRestored }: { onRestored: () => void }) {
   const [includeKey, setIncludeKey] = useState(false);
   const [keepApi, setKeepApi] = useState(true);
@@ -305,6 +326,7 @@ export function SettingsScreen({ profile }: { profile: Profile }) {
       {/* Form okunan değerlerle bir kez kurulur; yalnızca yedek geri yüklenince yeniden başlatılır. */}
       {settings && <ApiSection key={formVersion} settings={settings} />}
       <DifficultySection profile={profile} />
+      {settings && <SoundSection settings={settings} />}
       <DataSection onRestored={() => setFormVersion((version) => version + 1)} />
     </div>
   );

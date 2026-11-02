@@ -1,16 +1,22 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { Link } from 'wouter';
+import { setSoundEnabled } from '../../audio/sfx';
 import { PixelIcon } from '../../components/PixelIcon';
+import { Scene } from '../../components/Scene';
 import { db, getSettings } from '../../db/database';
 import { phaseOfDay, TOTAL_DAYS, weekOfDay } from '../../domain/program';
-import { SUCCESS_THRESHOLD } from '../../domain/progress';
+import { heroTier, SUCCESS_THRESHOLD } from '../../domain/progress';
 import type { Profile, Quest } from '../../domain/types';
+import { bossOfWeek, daysUntilBoss, LOCATIONS, narratorLine, timeOfDay, type BossState } from '../../domain/world';
 import { remindPendingQuests } from '../../notifications/notifications';
 import { rerollSideQuest, toggleQuest } from '../../quests/actions';
 import { syncStatus, upgradePoolWeek } from '../../quests/sync';
 import { useProgress } from '../useProgram';
-import { HeroBar, LevelUpToast, YesterdayNotice } from './HeroBar';
+import { BossEncounter, BossTeaser } from './BossCard';
+import { Celebration, useCelebrations } from './Celebration';
+import { DayIntro } from './DayIntro';
+import { HeroBar, YesterdayNotice } from './HeroBar';
 import { InstallPrompt } from './InstallPrompt';
 import { NotificationPrompt } from './NotificationPrompt';
 import { QuestCard } from './QuestCard';
@@ -62,28 +68,41 @@ function SourceNotice({ lastError, hasKey }: { lastError?: string; hasKey: boole
 function StatusBanner({ mains, threshold }: { mains: Quest[]; threshold: number }) {
   const done = mains.filter((quest) => quest.status === 'done').length;
   const needed = Math.ceil(threshold * mains.length);
-  if (done >= needed) {
-    return (
-      <p className="flex items-center gap-2 bg-panel-high px-3 py-2 text-sm text-moss" role="status">
-        <PixelIcon name="check" size={16} />
-        Günü kazandın, serin güvende.
-      </p>
-    );
-  }
+  const won = done >= needed;
   return (
-    <p className="flex items-center gap-2 bg-panel-high px-3 py-2 text-sm" role="status">
-      <PixelIcon name="flame" size={16} className="text-amber" />
-      Seriyi korumak için {needed - done} ana görev daha.
-    </p>
+    <div className={`flex items-center justify-between gap-3 bg-panel-high px-3 py-2 text-sm ${won ? 'text-moss' : ''}`}>
+      <p role="status" className="flex min-w-0 items-center gap-2">
+        <PixelIcon name={won ? 'check' : 'flame'} size={16} className={won ? '' : 'text-amber'} />
+        {won ? 'Günü kazandın, serin güvende.' : `Seriyi korumak için ${needed - done} ana görev daha.`}
+      </p>
+      <span aria-hidden="true" className="flex shrink-0 gap-0.5">
+        {mains.map((quest, index) => (
+          <PixelIcon
+            key={quest.id}
+            name="shield"
+            size={12}
+            className={index < done ? 'text-moss' : index < needed ? 'text-line' : 'text-ink-soft'}
+          />
+        ))}
+      </span>
+    </div>
   );
 }
 
 function SectionTitle({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <h2 className="text-xl">{children}</h2>
+      <h2 className="inline-flex items-center gap-2 text-xl">{children}</h2>
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </div>
+  );
+}
+
+function Narrator({ text }: { text: string }) {
+  return (
+    <p key={text} className="dialog-box animate-rise px-3 py-2.5 text-sm leading-snug">
+      {text}
+    </p>
   );
 }
 
@@ -108,28 +127,22 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
     // Yalnızca gün değişince veya görevler ilk yüklendiğinde hatırlatır, her işaretlemede değil.
   }, [hasQuests, todayNumber]);
 
-  // Seviye atlama yalnızca bu ekranda bir görev bitince kutlanır, açılışta değil.
   const progress = useProgress(todayNumber);
-  const previousLevel = useRef<number | null>(null);
-  const [levelUp, setLevelUp] = useState<number | null>(null);
-  useEffect(() => {
-    if (!progress) return;
-    if (previousLevel.current !== null && progress.level > previousLevel.current) setLevelUp(progress.level);
-    previousLevel.current = progress.level;
-  }, [progress]);
-  useEffect(() => {
-    if (levelUp === null) return;
-    const timer = setTimeout(() => setLevelUp(null), 2500);
-    return () => clearTimeout(timer);
-  }, [levelUp]);
+  const celebration = useCelebrations(progress, data?.quests, todayNumber);
+  const soundEnabled = data?.settings.soundEnabled !== false;
+  useEffect(() => setSoundEnabled(soundEnabled), [soundEnabled]);
 
   const handleToggle = useCallback((quest: Quest) => void toggleQuest(quest.id, todayNumber), [todayNumber]);
   const handleReroll = useCallback((quest: Quest) => void rerollSideQuest(quest.id, todayNumber), [todayNumber]);
 
+  const time = timeOfDay(new Date().getHours());
+
   if (todayNumber < 1) {
     return (
-      <div className="space-y-4 pt-10 text-center">
-        <PixelIcon name="flag" size={48} className="text-amber" />
+      <div className="space-y-4 text-center">
+        <div className="scene-bleed">
+          <Scene phase="temel" time={time} journey={0} tier={0} tintStatusBar />
+        </div>
         <h1 className="text-3xl">Macera yarın başlıyor</h1>
         <p className="text-muted">İlk görevlerin {profile.startDate.split('-').reverse().join('.')} günü burada olacak. İyi dinlen.</p>
       </div>
@@ -138,8 +151,10 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
 
   if (todayNumber > TOTAL_DAYS) {
     return (
-      <div className="space-y-4 pt-10 text-center">
-        <PixelIcon name="star" size={48} className="text-amber" />
+      <div className="space-y-4 text-center">
+        <div className="scene-bleed">
+          <Scene phase="ustalik" time={time} journey={1} tier={progress ? heroTier(progress.level) : 4} won tintStatusBar />
+        </div>
         <h1 className="text-4xl text-amber">66 gün tamam!</h1>
         <p>Bu macerayı bitirdin. Yolculuğunu Profil ekranında görebilirsin.</p>
         <p className="text-sm text-muted">Yeni bir macera için Ayarlar’dan sıfırlama yapabilirsin.</p>
@@ -156,20 +171,43 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
   const sides = quests.filter((quest) => quest.type === 'side');
   const boss = quests.find((quest) => quest.type === 'boss');
   const phase = phaseOfDay(todayNumber);
+  const weekNumber = weekOfDay(todayNumber);
+  const weekBoss = bossOfWeek(weekNumber);
+  const bossState: BossState = !boss ? 'none' : boss.status === 'done' ? 'defeated' : 'pending';
+  const won = progress?.outcomes[todayNumber] === 'success';
+  const todayXp = quests.reduce((sum, quest) => sum + (quest.status === 'done' ? quest.xp : 0), 0);
+  const bossIn = daysUntilBoss(todayNumber);
 
   return (
     <div className="space-y-5">
-      {levelUp !== null && <LevelUpToast level={levelUp} />}
-      <header>
-        <p className="font-pixel text-sm text-muted">
-          {phase.name} evresi · {weekOfDay(todayNumber)}. hafta{week ? `: ${week.theme}` : ''}
-        </p>
-        <h1 className="text-3xl">
-          Gün <span className="text-amber">{todayNumber}</span> / {TOTAL_DAYS}
-        </h1>
-      </header>
+      <DayIntro day={todayNumber} />
+      {celebration && <Celebration event={celebration} />}
+      <div>
+        <div className="scene-bleed">
+          <Scene
+            phase={phase.key}
+            time={time}
+            journey={(todayNumber - phase.firstDay) / (phase.lastDay - phase.firstDay)}
+            tier={progress ? heroTier(progress.level) : 0}
+            boss={bossState === 'pending' ? weekBoss : undefined}
+            won={won}
+            seed={phase.firstDay}
+            tintStatusBar
+          />
+        </div>
+        <header className="relative -mt-3">
+          <h1 className="text-outline text-4xl leading-none">
+            Gün <span className="text-amber">{todayNumber}</span> / {TOTAL_DAYS}
+          </h1>
+          <p className="mt-1 font-pixel text-sm text-muted">
+            {LOCATIONS[phase.key]} · {phase.name} evresi · {weekNumber}. hafta{week ? `: ${week.theme}` : ''}
+          </p>
+        </header>
+      </div>
 
-      {progress && <HeroBar progress={progress} />}
+      <Narrator text={narratorLine(todayNumber, { won, boss: bossState, time })} />
+
+      {progress && <HeroBar progress={progress} todayXp={todayXp} />}
       {progress && <YesterdayNotice progress={progress} todayNumber={todayNumber} />}
 
       <InstallPrompt dismissed={Boolean(settings.installPromptDismissed)} />
@@ -183,37 +221,36 @@ export function TodayScreen({ profile, todayNumber }: { profile: Profile; todayN
             onGranted={() => void remindPendingQuests(pendingCount).catch(console.error)}
           />
 
-          {boss && (
-            <section className="space-y-2.5" aria-label="Boss görevi">
-              <SectionTitle hint="Haftanın son meydan okuması">
-                <span className="inline-flex items-center gap-2 text-rose">
-                  <PixelIcon name="skull" size={20} />
-                  Boss
-                </span>
-              </SectionTitle>
-              <QuestCard quest={boss} onToggle={handleToggle} />
-            </section>
-          )}
+          {boss && <BossEncounter boss={weekBoss} quest={boss} onToggle={handleToggle} />}
 
           <section className="space-y-2.5" aria-label="Ana görevler">
-            <SectionTitle>Ana görevler</SectionTitle>
-            {mains.map((quest) => (
-              <QuestCard key={quest.id} quest={quest} onToggle={handleToggle} />
+            <SectionTitle hint={`${mains.filter((quest) => quest.status === 'done').length} / ${mains.length}`}>
+              <PixelIcon name="sword" size={18} className="text-amber" />
+              Ana görevler
+            </SectionTitle>
+            {mains.map((quest, index) => (
+              <QuestCard key={quest.id} quest={quest} onToggle={handleToggle} index={index} />
             ))}
           </section>
 
           <section className="space-y-2.5" aria-label="Yan görevler">
-            <SectionTitle hint="Seriyi etkilemez">Yan görevler</SectionTitle>
-            {sides.map((quest) => (
+            <SectionTitle hint="Seriyi etkilemez">
+              <PixelIcon name="star" size={18} className="text-orchid" />
+              Yan görevler
+            </SectionTitle>
+            {sides.map((quest, index) => (
               <QuestCard
                 key={quest.id}
                 quest={quest}
                 onToggle={handleToggle}
                 onReroll={handleReroll}
                 rerollUsed={day?.rerollUsed}
+                index={index}
               />
             ))}
           </section>
+
+          {!boss && bossIn > 0 && <BossTeaser boss={weekBoss} days={bossIn} />}
 
           <ReflectionCard key={`${todayNumber}-${reflection?.createdAt ?? 0}`} todayNumber={todayNumber} saved={reflection} />
 

@@ -22,11 +22,12 @@ export function BottomNav() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? 'page' : undefined}
-              className={`flex min-h-14 flex-col items-center justify-center gap-0.5 font-pixel text-sm ${
-                active ? 'text-amber' : 'text-muted'
+              className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 font-pixel text-sm active:bg-panel ${
+                active ? 'bg-panel text-amber' : 'text-muted'
               }`}
             >
-              <PixelIcon name={tab.icon} size={20} />
+              {active && <span aria-hidden="true" className="absolute inset-x-3 -top-0.5 h-0.5 bg-amber" />}
+              <PixelIcon key={String(active)} name={tab.icon} size={20} className={active ? 'animate-pop' : ''} />
               {tab.label}
             </Link>
           );

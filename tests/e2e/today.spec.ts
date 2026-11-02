@@ -104,6 +104,55 @@ test('Boss görevi haftanın son gününde çıkar', async ({ page }) => {
   await expect(questButtons(page, 'Boss görevi')).toHaveCount(1);
 });
 
+test('gün kazanılınca kutlama çıkar ve dokunmayı engellemez, açılışta tekrar etmez', async ({ page }) => {
+  await completeOnboarding(page);
+  const mains = questButtons(page, 'Ana görevler');
+  await expect(page.getByLabel('Yaklaşan Boss')).toContainText('Erteleme Gölgesi');
+  for (const index of [0, 1, 2]) await mains.nth(index).click();
+  await expect(page.getByText('Gün fethedildi')).toBeVisible();
+
+  await mains.nth(3).click();
+  await expect(mains.nth(3)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Gün fethedildi')).toBeHidden();
+
+  await page.reload();
+  await expect(mains).toHaveCount(4);
+  await expect(page.getByText('Gün fethedildi')).toHaveCount(0);
+});
+
+test('Boss günü isimli düşman çıkar, görev bitince yenilir', async ({ page }) => {
+  await page.clock.setFixedTime(at('2026-03-02T10:00:00'));
+  await completeOnboarding(page);
+  await page.clock.setFixedTime(at('2026-03-08T10:00:00'));
+  await page.reload();
+
+  const encounter = page.getByRole('region', { name: 'Boss görevi' });
+  await expect(encounter.getByRole('heading', { name: 'Erteleme Gölgesi' })).toBeVisible();
+  await expect(page.getByText('Erteleme Gölgesi yolunu kesti.')).toBeVisible();
+  await questButtons(page, 'Boss görevi').click();
+  await expect(page.getByText('Boss yenildi!')).toBeVisible();
+  await expect(page.getByText('Erteleme Gölgesi yenildi. Yol yeniden açık.')).toBeVisible();
+});
+
+test('hareket azaltma açıkken açılış kartı çıkmaz, kutlama yine okunur', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await completeOnboarding(page);
+  const mains = questButtons(page, 'Ana görevler');
+  for (const index of [0, 1, 2]) await mains.nth(index).click();
+  await expect(page.getByText('Gün fethedildi')).toBeVisible();
+});
+
+test('ses efektleri ayardan kapatılır', async ({ page }) => {
+  await completeOnboarding(page);
+  await page.getByRole('link', { name: 'Ayarlar' }).click();
+  const sound = page.getByLabel('Ses efektleri');
+  await expect(sound).toBeChecked();
+  await sound.uncheck();
+  await page.waitForTimeout(200);
+  await page.reload();
+  await expect(page.getByLabel('Ses efektleri')).not.toBeChecked();
+});
+
 test('bildirim izni kartla istenir, reddedilince bir daha sorulmaz', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(Notification, 'permission', { get: () => 'default' });

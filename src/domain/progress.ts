@@ -67,6 +67,15 @@ export function rankForLevel(level: number): string {
   return RANKS.find((rank) => level >= rank.minLevel)!.name;
 }
 
+/** Karakterin görünümü için rütbe sırası: 0 Çırak, 4 Efsane. */
+export function heroTier(level: number): number {
+  return RANKS.length - 1 - RANKS.findIndex((rank) => level >= rank.minLevel);
+}
+
+export function nextRank(level: number): { name: string; minLevel: number } | null {
+  return [...RANKS].reverse().find((rank) => rank.minLevel > level) ?? null;
+}
+
 /**
  * Tüm ilerleme kayıtlardan baştan hesaplanır, ayrıca saklanmaz. Böylece bugünkü bir görevin
  * geri alınması ya da yedekten içe aktarma, tutarsız bir sayaç bırakamaz.

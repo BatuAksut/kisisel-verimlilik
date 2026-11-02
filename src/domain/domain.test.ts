@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { computeAchievements } from './achievements';
 import { addDays, dayNumberFor, diffDays, toDateKey } from './dates';
 import { intensityFor, summarizeWeek } from './feedback';
 import { bossDayOfWeek, daysOfWeek, isBossDay, phaseOfDay, TOTAL_WEEKS, weekOfDay } from './program';
@@ -6,15 +7,18 @@ import {
   ABSENT_DAY_PENALTY,
   computeProgress,
   hardModePenalty,
+  heroTier,
   isDaySuccessful,
   levelFromXp,
   MAX_FREEZES,
+  nextRank,
   rankForLevel,
   totalXpAtLevel,
 } from './progress';
 import { REMINDER_INTERVAL_MS, shouldRemind } from './reminders';
 import { isDayUntouched, missingDayRecords, overdueQuestIds } from './reset';
 import type { DayRecord, Difficulty, Quest, QuestStatus, QuestType, Reflection } from './types';
+import { BOSSES, bossOfWeek, daysUntilBoss, narratorLine, timeOfDay } from './world';
 
 function quest(dayNumber: number, status: QuestStatus, overrides: Partial<Quest> & { type?: QuestType } = {}): Quest {
   return {
@@ -107,6 +111,44 @@ describe('gün sıfırlama', () => {
       { id: 'bugun', dayNumber: 4, status: 'pending' as const },
     ];
     expect(overdueQuestIds(quests, 4)).toEqual(['dun-bekleyen']);
+  });
+
+  it('saat ve gün dünyayı belirler, aynı durumda aynı cümle gelir', () => {
+    expect([4, 6, 12, 18, 21].map(timeOfDay)).toEqual(['night', 'dawn', 'day', 'dusk', 'night']);
+    expect(BOSSES).toHaveLength(TOTAL_WEEKS);
+    expect(bossOfWeek(1).name).toBe('Erteleme Gölgesi');
+    expect(bossOfWeek(TOTAL_WEEKS).name).toBe('Eski Sen');
+    expect(daysUntilBoss(1)).toBe(6);
+    expect(daysUntilBoss(7)).toBe(0);
+    expect(daysUntilBoss(64)).toBe(2);
+
+    const state = { won: false, boss: 'none', time: 'day' } as const;
+    expect(narratorLine(10, state)).toBe(narratorLine(10, state));
+    expect(narratorLine(1, state)).toContain('başlıyor');
+    expect(narratorLine(7, { ...state, boss: 'pending' })).toContain('Erteleme Gölgesi yolunu kesti');
+    expect(narratorLine(7, { ...state, boss: 'defeated' })).toContain('yenildi');
+    expect(narratorLine(10, { ...state, time: 'night' })).toContain('Gece');
+  });
+
+  it('karakter görünümü rütbeyle değişir', () => {
+    expect([1, 5, 10, 15, 20, 40].map(heroTier)).toEqual([0, 1, 2, 3, 4, 4]);
+    expect(nextRank(1)).toEqual({ name: 'Kâşif', minLevel: 5 });
+    expect(nextRank(19)).toEqual({ name: 'Efsane', minLevel: 20 });
+    expect(nextRank(20)).toBeNull();
+  });
+
+  it('rozetler kayıtlardan hesaplanır', () => {
+    const progress = computeProgress([], [], 1);
+    const titles = (quests: { status: 'done' | 'pending'; type: 'main' | 'boss' }[], day: number, level = progress) =>
+      computeAchievements(level, quests, day)
+        .filter((badge) => badge.unlocked)
+        .map((badge) => badge.title);
+
+    expect(titles([], 1)).toEqual([]);
+    expect(titles([{ status: 'pending', type: 'main' }], 1)).toEqual([]);
+    expect(titles([{ status: 'done', type: 'main' }], 1)).toEqual(['İlk Adım']);
+    expect(titles([{ status: 'done', type: 'boss' }], 22)).toEqual(['İlk Adım', 'İlk Zafer', 'Ormandan Çıkış']);
+    expect(titles([], 1, { ...progress, bestStreak: 7, level: 5 })).toEqual(['Kıvılcım', 'Alev', 'Kâşif']);
   });
 
   it('görev bitirilmiş ya da değiştirilmişse gün dokunulmuş sayılır', () => {

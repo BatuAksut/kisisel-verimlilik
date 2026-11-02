@@ -112,6 +112,7 @@ export interface AppSettings {
   lastReminderAt?: number;
   notificationPromptDismissed?: boolean;
   installPromptDismissed?: boolean;
+  soundEnabled?: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {

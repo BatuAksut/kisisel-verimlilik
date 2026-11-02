@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { PixelIcon } from '../../components/PixelIcon';
+import { Scene } from '../../components/Scene';
+import { HeroSprite, MonsterSprite } from '../../components/Sprite';
 import { db, saveSettings } from '../../db/database';
 import { addDays, toDateKey } from '../../domain/dates';
 import { DIFFICULTY_LABELS } from '../../domain/types';
+import { BOSSES, timeOfDay } from '../../domain/world';
 import { isQuestionAnswered, QUESTIONS, toAnswers, type AnswerValues, type Question } from './questions';
 
 function initialValues(): AnswerValues {
@@ -181,16 +184,25 @@ export function Onboarding() {
 
   if (step === -1) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg flex-col justify-center gap-6 px-4 py-8">
-        <div className="text-amber">
-          <PixelIcon name="sword" size={56} />
+      <div className="mx-auto flex min-h-dvh max-w-lg flex-col gap-6 px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))]">
+        <div className="scene-bleed">
+          <Scene phase="temel" time={timeOfDay(new Date().getHours())} journey={0} tier={0} tintStatusBar />
         </div>
-        <h1 className="text-5xl text-amber">Quest66</h1>
+        <h1 className="text-outline -mt-6 text-6xl leading-none text-amber">Quest66</h1>
         <p className="text-lg">
           Bir alışkanlığın oturması zaman ister. 66 gün boyunca görevleri tamamla, XP topla, her hafta bir Boss’la yüzleş.
         </p>
+        <section aria-label="Yoldaki Bosslar" className="boss-panel pixel-frame space-y-2 p-3">
+          <p className="font-pixel text-lg text-rose">Yolda {BOSSES.length} Boss seni bekliyor</p>
+          <div className="flex items-end justify-between">
+            {BOSSES.slice(0, 5).map((boss) => (
+              <MonsterSprite key={boss.name} boss={boss} scale={3} />
+            ))}
+          </div>
+          <p className="text-xs text-muted">İlki: {BOSSES[0].name}. {BOSSES[0].quote}</p>
+        </section>
         <p className="text-muted">Sana uygun bir macera kurmak için 15 kısa soru soracağım.</p>
-        <button type="button" className="pixel-btn pixel-frame" onClick={() => setStep(0)}>
+        <button type="button" className="pixel-btn pixel-frame mt-auto" onClick={() => setStep(0)}>
           Maceraya başla
         </button>
       </div>
@@ -215,6 +227,11 @@ export function Onboarding() {
         <p className="mb-1.5 font-pixel text-muted">
           Soru {step + 1} / {QUESTIONS.length}
         </p>
+        <div className="relative h-8" aria-hidden="true">
+          <span className="absolute bottom-0 -translate-x-1/2" style={{ left: `${((step + 1) / QUESTIONS.length) * 92 + 4}%` }}>
+            <HeroSprite tier={0} scale={2} className="block" />
+          </span>
+        </div>
         <div className="h-2 bg-panel" role="presentation">
           <div className="h-full bg-amber" style={{ width: `${((step + 1) / QUESTIONS.length) * 100}%` }} />
         </div>

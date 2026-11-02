@@ -14,7 +14,11 @@ export function XpBar({ value, max, label }: { value: number; max: number; label
       style={{ gridTemplateColumns: `repeat(${SEGMENTS}, 1fr)` }}
     >
       {Array.from({ length: SEGMENTS }, (_, index) => (
-        <span key={index} className={index < filled ? 'bg-amber' : 'bg-panel-high'} />
+        <span
+          key={index}
+          className={index < filled ? 'bg-amber' : 'bg-panel-high'}
+          style={index === filled - 1 ? { background: '#ffe28a' } : undefined}
+        />
       ))}
     </div>
   );

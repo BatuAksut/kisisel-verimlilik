@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PixelIcon } from '../../components/PixelIcon';
+import { PixelIcon, type IconName } from '../../components/PixelIcon';
 import { db } from '../../db/database';
 import type { Reflection } from '../../domain/types';
 
@@ -17,7 +17,10 @@ export function ReflectionCard({ todayNumber, saved }: { todayNumber: number; sa
       <section aria-label="Akşam yansıtması" className="panel pixel-frame flex items-start gap-3 p-3">
         <PixelIcon name="moon" size={20} className="mt-0.5 text-ice" />
         <div className="min-w-0 flex-1">
-          <p className="font-pixel">Bugünkü ruh halin: {MOODS[saved.mood - 1]}</p>
+          <p className="flex items-center gap-1.5 font-pixel">
+            <PixelIcon name={`face${saved.mood}` as IconName} size={16} className="text-ice" />
+            Bugünkü ruh halin: {MOODS[saved.mood - 1]}
+          </p>
           {saved.note && <p className="mt-0.5 text-sm break-words text-muted">{saved.note}</p>}
         </div>
         <button
@@ -68,16 +71,16 @@ export function ReflectionCard({ todayNumber, saved }: { todayNumber: number; sa
               aria-checked={selected}
               aria-label={`${value}: ${label}`}
               onClick={() => setMood(value)}
-              className={`min-h-11 border-2 font-pixel text-lg ${
-                selected ? 'border-ice bg-ice text-ink' : 'border-line bg-ink-soft'
+              className={`flex min-h-11 items-center justify-center border-2 ${
+                selected ? 'border-ice bg-ice text-ink' : 'border-line bg-ink-soft text-muted'
               }`}
             >
-              {value}
+              <PixelIcon name={`face${value}` as IconName} size={24} />
             </button>
           );
         })}
       </div>
-      <p className="min-h-5 text-center text-sm text-muted">{mood ? MOODS[mood - 1] : '1 çok kötü, 5 harika'}</p>
+      <p className="min-h-5 text-center text-sm text-muted">{mood ? MOODS[mood - 1] : 'Soldan sağa: çok kötüden harikaya'}</p>
       <input
         className="field pixel-frame"
         maxLength={140}

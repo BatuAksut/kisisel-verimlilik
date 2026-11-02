@@ -11,32 +11,35 @@ import { SettingsScreen } from './features/settings/SettingsScreen';
 import { TodayScreen } from './features/today/TodayScreen';
 import { useTodayNumber } from './features/useProgram';
 
-/** Sekme değişince yeni ekran en üstten başlar, tarayıcı gibi eski kaydırma konumunda kalmaz. */
-function ScrollToTop() {
+function Screens({ profile, todayNumber }: { profile: Profile; todayNumber: number }) {
   const [location] = useLocation();
+  // Sekme değişince yeni ekran en üstten başlar, tarayıcı gibi eski kaydırma konumunda kalmaz.
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location]);
-  return null;
+  return (
+    <div key={location} className="animate-screen">
+      <Switch>
+        <Route path="/profil">
+          <ProfileScreen profile={profile} todayNumber={todayNumber} />
+        </Route>
+        <Route path="/ayarlar">
+          <SettingsScreen profile={profile} />
+        </Route>
+        <Route>
+          <TodayScreen profile={profile} todayNumber={todayNumber} />
+        </Route>
+      </Switch>
+    </div>
+  );
 }
 
 function Game({ profile }: { profile: Profile }) {
   const todayNumber = useTodayNumber(profile);
   return (
     <Router hook={useHashLocation}>
-      <ScrollToTop />
       <main className="mx-auto max-w-lg px-4 pb-24 pt-[max(1rem,env(safe-area-inset-top))]">
-        <Switch>
-          <Route path="/profil">
-            <ProfileScreen profile={profile} todayNumber={todayNumber} />
-          </Route>
-          <Route path="/ayarlar">
-            <SettingsScreen profile={profile} />
-          </Route>
-          <Route>
-            <TodayScreen profile={profile} todayNumber={todayNumber} />
-          </Route>
-        </Switch>
+        <Screens profile={profile} todayNumber={todayNumber} />
       </main>
       <BottomNav />
     </Router>

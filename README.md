@@ -4,7 +4,8 @@
 
 - **Program:** Temel (1-21. gün), Yükseliş (22-44), Ustalık (45-66). Görevler haftalık üretilir ve geçen haftanın verisine göre ayarlanır.
 - **Görevler:** Günde 3-5 ana görev, 1-2 yan görev, her haftanın sonunda bir Boss.
-- **Oyun:** XP, seviye, 5 özellik, seri, seri dondurucu ve Hard Mode cezası.
+- **Oyun:** XP, seviye, 5 özellik, seri, seri dondurucu, Hard Mode cezası ve 13 rozet.
+- **Dünya:** 3 bölge (Kamp Ormanı, Rüzgârlı Geçit, Zirve Kalesi), saate göre değişen manzara, rütbeyle gelişen karakter, her hafta isimli bir Boss, kod ile çizilen tüm görseller ve 8-bit ses efektleri.
 - **Yapay zekâ:** OpenAI uyumlu herhangi bir API. Çalışmazsa 82 görevlik hazır havuz devreye girer, uygulama hiç boş kalmaz.
 
 ## Kurulum
